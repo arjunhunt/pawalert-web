@@ -40,11 +40,14 @@ export default function AlertDetailPage() {
   const id = params?.id as string;
 
   const [report, setReport] = useState<DogReport | null>(null);
-  const [helperName, setHelperName] = useState<string>("Arjun");
+  const [helperName, setHelperName] = useState<string>("Community Feeder");
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [shareCopied, setShareCopied] = useState<boolean>(false);
 
   useEffect(() => {
+    const savedName = localStorage.getItem("pawalert_user_name");
+    if (savedName) setHelperName(savedName);
+
     const fetchSingleReport = async () => {
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase
@@ -84,10 +87,11 @@ export default function AlertDetailPage() {
   // Claim report
   const handleClaim = async () => {
     setIsUpdating(true);
+    const activeName = localStorage.getItem("pawalert_user_name") || helperName || "Community Feeder";
     const updated = {
       ...report,
       status: "IN_PROGRESS" as const,
-      helper_name: helperName || "Community Feeder",
+      helper_name: activeName,
       updated_at: new Date().toISOString(),
     };
 
@@ -96,7 +100,7 @@ export default function AlertDetailPage() {
         .from("reports")
         .update({
           status: "IN_PROGRESS",
-          helper_name: helperName || "Community Feeder",
+          helper_name: activeName,
         })
         .eq("id", id);
     }
@@ -118,6 +122,15 @@ export default function AlertDetailPage() {
         .from("reports")
         .update({ status: "RESOLVED" })
         .eq("id", id);
+    }
+
+    // Increment personal user stats in localStorage
+    if (report.problem_type === "INJURED" || report.problem_type === "SICK" || report.problem_type === "STUCK" || report.problem_type === "NEWBORN_LITTER") {
+      const rescues = parseInt(localStorage.getItem("pawalert_rescues") || "0", 10);
+      localStorage.setItem("pawalert_rescues", (rescues + 1).toString());
+    } else {
+      const fed = parseInt(localStorage.getItem("pawalert_dogs_fed") || "0", 10);
+      localStorage.setItem("pawalert_dogs_fed", (fed + 1).toString());
     }
 
     setReport(updated);

@@ -25,8 +25,10 @@ export default function ReportPage() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  // Auto-detect browser GPS on mount
+  // Auto-detect browser GPS and user handle on mount
   useEffect(() => {
+    const savedName = localStorage.getItem("pawalert_user_name");
+    if (savedName) setReporterName(savedName);
     detectLocation();
   }, []);
 
@@ -89,11 +91,19 @@ export default function ReportPage() {
         ]).select();
 
         if (error) throw error;
+
+        // Increment user's reports counter in localStorage
+        const curReports = parseInt(localStorage.getItem("pawalert_reports_made") || "0", 10);
+        localStorage.setItem("pawalert_reports_made", (curReports + 1).toString());
+
         if (data && data[0]) {
           router.push(`/alert/${data[0].id}`);
           return;
         }
       }
+
+      const curReports = parseInt(localStorage.getItem("pawalert_reports_made") || "0", 10);
+      localStorage.setItem("pawalert_reports_made", (curReports + 1).toString());
 
       // Fallback: Redirect to home on success
       router.push("/");
