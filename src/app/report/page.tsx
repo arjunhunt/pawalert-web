@@ -307,14 +307,13 @@ export default function ReportPage() {
                 {/* Pincode */}
                 <div>
                   <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                    Pincode *
+                    Pincode
                   </label>
                   <input
                     type="text"
                     value={pincode}
                     onChange={(e) => setPincode(e.target.value)}
                     placeholder="e.g. 396170"
-                    required
                     className="w-full bg-darkCard border border-darkBorder rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
                   />
                 </div>
@@ -338,14 +337,13 @@ export default function ReportPage() {
                 {/* Exact location / Street */}
                 <div>
                   <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                    Exact location / Street *
+                    Exact location / Street
                   </label>
                   <input
                     type="text"
                     value={street}
                     onChange={(e) => setStreet(e.target.value)}
                     placeholder="e.g. Near MG Road Metro Station, Main Bazar Road"
-                    required
                     className="w-full bg-darkCard border border-darkBorder rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
                   />
                   <p className="text-[11px] text-neutral-500 mt-1">Street name or nearest identifiable spot</p>
@@ -370,14 +368,13 @@ export default function ReportPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div>
                     <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                      City / Town *
+                      City / Town
                     </label>
                     <input
                       type="text"
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                       placeholder="e.g. Umargam, Mumbai"
-                      required
                       className="w-full bg-darkCard border border-darkBorder rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
                     />
                   </div>
