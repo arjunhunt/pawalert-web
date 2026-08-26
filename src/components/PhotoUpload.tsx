@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Camera, Upload, X, Check, Image as ImageIcon } from "lucide-react";
+import { Camera, Image as ImageIcon, X, Check, Upload } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 
 interface PhotoUploadProps {
@@ -15,67 +15,81 @@ export default function PhotoUpload({
 }: PhotoUploadProps) {
   const [preview, setPreview] = useState<string>(currentPhotoUrl || "");
   const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Compress and process photo locally before upload
-  const processImageFile = async (file: File) => {
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Safe and lightweight image compression using HTMLImageElement
+  const processImageFile = (file: File) => {
     setIsUploading(true);
-    try {
-      const bitmap = await createImageBitmap(file);
-      const canvas = document.createElement("canvas");
-      const maxDim = 800;
-      let { width, height } = bitmap;
 
-      if (width > maxDim || height > maxDim) {
-        if (width > height) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        } else {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
-        }
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      ctx?.drawImage(bitmap, 0, 0, width, height);
-
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
-      setPreview(dataUrl);
-
-      // If Supabase is configured with Storage, upload to bucket
-      if (isSupabaseConfigured && supabase) {
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      const img = new Image();
+      img.onload = async () => {
         try {
-          const blob = await (await fetch(dataUrl)).blob();
-          const fileName = `report-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-          const { data, error } = await supabase.storage
-            .from("dog-photos")
-            .upload(fileName, blob, { contentType: "image/jpeg", upsert: true });
+          const canvas = document.createElement("canvas");
+          const maxDim = 800;
+          let width = img.width;
+          let height = img.height;
 
-          if (!error && data) {
-            const { data: publicData } = supabase.storage
-              .from("dog-photos")
-              .getPublicUrl(fileName);
-
-            if (publicData?.publicUrl) {
-              onPhotoReady(publicData.publicUrl);
-              setIsUploading(false);
-              return;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
             }
           }
-        } catch (storageError) {
-          console.warn("Storage upload failed, falling back to data URI", storageError);
-        }
-      }
 
-      // Default / fallback: use optimized Base64 data URL directly
-      onPhotoReady(dataUrl);
-    } catch (e) {
-      console.error("Error processing photo", e);
-    } finally {
-      setIsUploading(false);
-    }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+          setPreview(dataUrl);
+
+          // If Supabase Storage is configured, upload to bucket
+          if (isSupabaseConfigured && supabase) {
+            try {
+              const res = await fetch(dataUrl);
+              const blob = await res.blob();
+              const fileName = `report-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+              const { data, error } = await supabase.storage
+                .from("dog-photos")
+                .upload(fileName, blob, { contentType: "image/jpeg", upsert: true });
+
+              if (!error && data) {
+                const { data: publicData } = supabase.storage
+                  .from("dog-photos")
+                  .getPublicUrl(fileName);
+
+                if (publicData?.publicUrl) {
+                  onPhotoReady(publicData.publicUrl);
+                  setIsUploading(false);
+                  return;
+                }
+              }
+            } catch (storageError) {
+              console.warn("Storage upload failed, using data URI", storageError);
+            }
+          }
+
+          // Fallback: use data URI
+          onPhotoReady(dataUrl);
+        } catch (e) {
+          console.error("Error processing photo canvas", e);
+        } finally {
+          setIsUploading(false);
+        }
+      };
+
+      img.src = readerEvent.target?.result as string;
+    };
+
+    reader.readAsDataURL(file);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,13 +102,24 @@ export default function PhotoUpload({
   const clearPhoto = () => {
     setPreview("");
     onPhotoReady("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full space-y-3">
+      {/* Hidden standard gallery file input (safe against OS low memory kill) */}
       <input
-        ref={fileInputRef}
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
+      {/* Hidden camera file input */}
+      <input
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
@@ -120,27 +145,49 @@ export default function PhotoUpload({
           </button>
           <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg flex items-center space-x-1">
             <Check className="w-3.5 h-3.5 text-green-400" />
-            <span>Photo captured</span>
+            <span>Photo ready</span>
           </div>
         </div>
       ) : (
-        <div
-          onClick={() => fileInputRef.current?.click()}
-          className="w-full h-52 border-2 border-dashed border-darkBorder hover:border-pawAmber/60 bg-darkCard/50 hover:bg-darkCard rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all duration-200 p-6 text-center group"
-        >
-          <div className="w-14 h-14 rounded-2xl bg-pawAmber/10 flex items-center justify-center text-pawAmber group-hover:scale-110 transition-transform mb-3 border border-pawAmber/20">
-            <Camera className="w-7 h-7" />
+        <div className="bg-darkCard/60 border border-darkBorder rounded-2xl p-6 text-center space-y-4">
+          <div className="space-y-1">
+            <p className="text-neutral-200 text-sm font-bold">
+              Add a Photo of the Dog
+            </p>
+            <p className="text-neutral-400 text-xs">
+              Upload from your gallery or use camera to help rescuers locate the dog
+            </p>
           </div>
-          <p className="text-neutral-200 text-sm font-bold">
-            Take a Dog Photo or Upload
-          </p>
-          <p className="text-neutral-400 text-xs mt-1">
-            Supports camera capture on phone and gallery images (JPEG, PNG)
-          </p>
+
+          <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
+            {/* Gallery Option (Safe & recommended on Xiaomi / low memory devices) */}
+            <button
+              type="button"
+              onClick={() => galleryInputRef.current?.click()}
+              className="flex flex-col items-center justify-center p-4 rounded-xl bg-darkBg hover:bg-neutral-800 border border-darkBorder hover:border-pawAmber/50 transition-all text-xs font-bold text-neutral-200 space-y-2 group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-pawAmber/10 flex items-center justify-center text-pawAmber group-hover:scale-105 transition-transform">
+                <ImageIcon className="w-5 h-5" />
+              </div>
+              <span>Choose Photo</span>
+            </button>
+
+            {/* Camera Option */}
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              className="flex flex-col items-center justify-center p-4 rounded-xl bg-darkBg hover:bg-neutral-800 border border-darkBorder hover:border-pawAmber/50 transition-all text-xs font-bold text-neutral-200 space-y-2 group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-pawAmber/10 flex items-center justify-center text-pawAmber group-hover:scale-105 transition-transform">
+                <Camera className="w-5 h-5" />
+              </div>
+              <span>Take Camera Photo</span>
+            </button>
+          </div>
 
           {isUploading && (
-            <p className="text-xs text-pawAmber font-semibold mt-3 animate-pulse">
-              Optimizing photo...
+            <p className="text-xs text-pawAmber font-semibold animate-pulse">
+              Optimizing image...
             </p>
           )}
         </div>
