@@ -22,7 +22,7 @@ const MapView = dynamic(() => import("@/components/MapView"), {
 });
 
 export default function Home() {
-  const [reports, setReports] = useState<DogReport[]>(DEMO_REPORTS);
+  const [reports, setReports] = useState<DogReport[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<ProblemType | null>(null);
@@ -40,12 +40,12 @@ export default function Home() {
           .select("*")
           .order("created_at", { ascending: false });
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           setReports(data as DogReport[]);
         }
       }
     } catch (e) {
-      console.warn("Could not load from Supabase, using local data", e);
+      console.warn("Could not load from Supabase", e);
     } finally {
       setIsLoading(false);
     }
@@ -263,20 +263,31 @@ export default function Home() {
               <Dog className="w-8 h-8" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-lg font-bold text-white">No Dog Alerts Found</h3>
+              <h3 className="text-lg font-bold text-white">No Dog Alerts in this Area</h3>
               <p className="text-neutral-400 text-xs sm:text-sm">
-                No active distress alerts match your filter in this area.
+                No dogs currently need help in this filter. Seen a stray dog that needs food or care?
               </p>
             </div>
-            <button
-              onClick={() => {
-                setSelectedCategory(null);
-                setSelectedStatus("ALL");
-              }}
-              className="text-xs text-pawAmber font-semibold hover:underline"
-            >
-              Clear filters
-            </button>
+            <div className="flex items-center space-x-3 pt-2">
+              <a
+                href="/report"
+                className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-pawAmber hover:bg-pawAmber-hover text-white text-xs font-bold shadow-lg shadow-pawAmber/20 transition-all"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Report a Dog Alert</span>
+              </a>
+              {(selectedCategory !== null || selectedStatus !== "ACTIVE") && (
+                <button
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    setSelectedStatus("ACTIVE");
+                  }}
+                  className="text-xs text-neutral-400 hover:text-white px-3 py-2"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
