@@ -28,7 +28,7 @@ import CommentsSection from "@/components/CommentsSection";
 import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
 import { DEMO_REPORTS, supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { formatTimeAgo } from "@/lib/geo";
-import { isMyReport, removeMyReportId, getUserName, syncStatsToCloud } from "@/lib/user";
+import { isMyReport, removeMyReportId, getUserName, syncStatsToCloud, isAdmin } from "@/lib/user";
 
 // Dynamic map preview for detail screen
 const MapView = dynamic(() => import("@/components/MapView"), {
@@ -54,9 +54,11 @@ export default function AlertDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isAuthor, setIsAuthor] = useState<boolean>(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
 
   useEffect(() => {
     setHelperName(getUserName());
+    setIsSuperAdmin(isAdmin());
 
     const fetchSingleReport = async () => {
       if (isSupabaseConfigured && supabase) {
@@ -231,8 +233,20 @@ export default function AlertDetailPage() {
           </Link>
 
           <div className="flex items-center space-x-2">
-            {/* Creator Delete Button */}
-            {isAuthor && (
+            {/* Super Admin Master Delete Button */}
+            {isSuperAdmin && (
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-red-950 hover:bg-red-900 border border-red-500/80 text-red-200 text-xs font-bold transition-all shadow-lg shadow-red-950/50"
+                title="Founder Admin: Master Delete this alert"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                <span>👑 Master Take-Down</span>
+              </button>
+            )}
+
+            {/* Regular Author Delete Button */}
+            {!isSuperAdmin && isAuthor && (
               <button
                 onClick={() => setShowDeleteModal(true)}
                 className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 text-xs font-semibold transition-colors"

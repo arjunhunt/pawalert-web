@@ -1,6 +1,8 @@
 import { DogReport } from "./types";
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
 
+export const ADMIN_SECRET_PASSCODE = "shipra@3007";
+
 export interface UserProfile {
   id: string;
   email?: string | null;
@@ -63,6 +65,9 @@ export function isMyReport(report: DogReport | null): boolean {
   if (!report) return false;
   if (typeof window === "undefined") return false;
 
+  // If user is super admin, they have master ownership/take-down privileges
+  if (isAdmin()) return true;
+
   const currentUserId = getUserId();
   const currentUserName = getUserName();
 
@@ -88,6 +93,28 @@ export function isMyReport(report: DogReport | null): boolean {
   }
 
   return false;
+}
+
+/**
+ * Super Admin & Founder Privileges
+ */
+export function isAdmin(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("pawalert_is_admin") === "true";
+}
+
+export function unlockAdmin(passcode: string): boolean {
+  if (typeof window === "undefined") return false;
+  if (passcode.trim() === ADMIN_SECRET_PASSCODE) {
+    localStorage.setItem("pawalert_is_admin", "true");
+    return true;
+  }
+  return false;
+}
+
+export function lockAdmin(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("pawalert_is_admin");
 }
 
 /**

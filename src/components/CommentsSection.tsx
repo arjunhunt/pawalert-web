@@ -16,7 +16,7 @@ import {
   COMMENT_TYPE_TAGS,
 } from "@/lib/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { getUserId, getUserName } from "@/lib/user";
+import { getUserId, getUserName, isAdmin } from "@/lib/user";
 import { formatTimeAgo } from "@/lib/geo";
 import { sanitizeText, checkRateLimit } from "@/lib/security";
 
@@ -34,9 +34,14 @@ export default function CommentsSection({
   const [selectedType, setSelectedType] = useState<CommentType>("GENERAL");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
 
   const currentUserId = getUserId();
   const currentUserName = getUserName();
+
+  useEffect(() => {
+    setIsSuperAdmin(isAdmin());
+  }, []);
 
   // Fetch comments
   const fetchComments = async () => {
@@ -302,12 +307,20 @@ export default function CommentsSection({
                       <Clock className="w-3 h-3" />
                       <span>{formatTimeAgo(comment.created_at)}</span>
                     </span>
-                    {isMyComment && (
+                    {(isMyComment || isSuperAdmin) && (
                       <button
                         type="button"
                         onClick={() => handleDeleteComment(comment.id)}
-                        className="text-neutral-500 hover:text-red-400 transition-colors p-1"
-                        title="Delete update"
+                        className={`transition-colors p-1 ${
+                          isSuperAdmin && !isMyComment
+                            ? "text-red-400 hover:text-red-300"
+                            : "text-neutral-500 hover:text-red-400"
+                        }`}
+                        title={
+                          isSuperAdmin && !isMyComment
+                            ? "👑 Founder Admin: Delete spam comment"
+                            : "Delete your update"
+                        }
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

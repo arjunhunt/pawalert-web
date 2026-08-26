@@ -339,6 +339,20 @@ export default function ProfilePage() {
               )}
             </button>
           </form>
+
+          {/* Super Admin Control Access */}
+          <div className="pt-4 border-t border-darkBorder flex items-center justify-between text-xs">
+            <span className="text-neutral-500 text-[11px]">
+              PawAlert Platform Moderator
+            </span>
+            <Link
+              href="/admin"
+              className="text-neutral-400 hover:text-pawAmber font-semibold transition-colors flex items-center space-x-1 text-xs"
+            >
+              <span>👑 Founder Admin Portal</span>
+              <span>→</span>
+            </Link>
+          </div>
         </div>
       </main>
 
