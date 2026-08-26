@@ -18,6 +18,7 @@ import {
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { getUserId, getUserName } from "@/lib/user";
 import { formatTimeAgo } from "@/lib/geo";
+import { sanitizeText, checkRateLimit } from "@/lib/security";
 
 interface CommentsSectionProps {
   reportId: string;
@@ -92,18 +93,40 @@ export default function CommentsSection({
     }
   }, [reportId]);
 
+  const [honeypot, setHoneypot] = useState<string>("");
+  const [rateLimitError, setRateLimitError] = useState<string>("");
+
   // Post comment
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Honeypot check
+    if (honeypot.trim().length > 0) {
+      setContent("");
+      return;
+    }
+
+    // Rate limit check: 4s cooldown
+    const rateCheck = checkRateLimit("comment_post", 4000);
+    if (!rateCheck.allowed) {
+      setRateLimitError(`Please wait ${rateCheck.remainingSec}s before posting another update.`);
+      setTimeout(() => setRateLimitError(""), 3000);
+      return;
+    }
+
     if (!content.trim()) return;
 
     setIsSubmitting(true);
+    setRateLimitError("");
+
+    const sanitizedContent = sanitizeText(content, 500);
+
     const newComment: ReportComment = {
       id: `local-${Date.now()}`,
       report_id: reportId,
       author_id: currentUserId,
-      author_name: currentUserName,
-      content: content.trim(),
+      author_name: sanitizeText(currentUserName, 60),
+      content: sanitizedContent,
       comment_type: selectedType,
       created_at: new Date().toISOString(),
     };
@@ -116,8 +139,8 @@ export default function CommentsSection({
             {
               report_id: reportId,
               author_id: currentUserId,
-              author_name: currentUserName,
-              content: content.trim(),
+              author_name: sanitizeText(currentUserName, 60),
+              content: sanitizedContent,
               comment_type: selectedType,
             },
           ])
@@ -197,6 +220,24 @@ export default function CommentsSection({
 
       {/* Post Form */}
       <form onSubmit={handleSubmit} className="space-y-2">
+        {/* Anti-Bot Honeypot */}
+        <input
+          type="text"
+          name="hp_comment_trap"
+          value={honeypot}
+          onChange={(e) => setHoneypot(e.target.value)}
+          tabIndex={-1}
+          autoComplete="off"
+          className="opacity-0 absolute -z-50 w-0 h-0 pointer-events-none select-none"
+          aria-hidden="true"
+        />
+
+        {rateLimitError && (
+          <p className="text-xs font-bold text-amber-400 animate-pulse">
+            ⚠️ {rateLimitError}
+          </p>
+        )}
+
         <div className="relative">
           <textarea
             value={content}

@@ -17,6 +17,12 @@ import PhotoUpload from "@/components/PhotoUpload";
 import { ProblemType, PROBLEM_TYPE_LABELS } from "@/lib/types";
 import { reverseGeocodeDetailed } from "@/lib/geo";
 import { getUserId, getUserName, addMyReportId } from "@/lib/user";
+import {
+  isSafeImageUrl,
+  sanitizeText,
+  validateCoordinates,
+  checkRateLimit,
+} from "@/lib/security";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 
 const INDIAN_STATES = [
@@ -108,31 +114,67 @@ export default function ReportPage() {
     );
   };
 
+  const [honeypot, setHoneypot] = useState<string>("");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Bot Honeypot Trap Check: If hidden field is filled, silently ignore bot spam
+    if (honeypot.trim().length > 0) {
+      console.warn("Spam bot detected via honeypot trap");
+      router.push("/");
+      return;
+    }
+
+    // 2. Client-Side Anti-Flood Rate Limiting (20s cooldown between reports)
+    const rateCheck = checkRateLimit("report_broadcast", 20000);
+    if (!rateCheck.allowed) {
+      setErrorMessage(`Please wait ${rateCheck.remainingSec}s before broadcasting another alert.`);
+      return;
+    }
+
     if (!photoUrl) {
       setErrorMessage("Please capture or upload a dog photo.");
       return;
     }
+
+    // 3. Safe Image Protocol Validation (Anti-XSS)
+    if (!isSafeImageUrl(photoUrl)) {
+      setErrorMessage("Invalid image format or insecure image source.");
+      return;
+    }
+
     if (!description.trim()) {
       setErrorMessage("Please describe the dog's condition or situation.");
       return;
     }
-    if (latitude === null || longitude === null) {
-      setErrorMessage("GPS location is required to broadcast the alert.");
+
+    // 4. Coordinates Range & Sanity Validation
+    if (!validateCoordinates(latitude, longitude)) {
+      setErrorMessage("Valid GPS coordinates are required to broadcast the alert.");
       return;
     }
 
     setIsSubmitting(true);
     setErrorMessage("");
 
+    // 5. Input Sanitization & Length Bounding
+    const sanitizedDesc = sanitizeText(description, 1000);
+    const sanitizedArea = sanitizeText(area, 150);
+    const sanitizedStreet = sanitizeText(street, 150);
+    const sanitizedCity = sanitizeText(city, 100);
+    const sanitizedState = sanitizeText(state, 50);
+    const sanitizedPincode = sanitizeText(pincode, 20);
+    const sanitizedLandmark = sanitizeText(landmark, 250);
+    const sanitizedReporterName = sanitizeText(reporterName, 60);
+
     // Build formatted full address
     const addressParts: string[] = [];
-    if (street.trim()) addressParts.push(street.trim());
-    if (area.trim()) addressParts.push(area.trim());
-    if (city.trim()) addressParts.push(city.trim());
-    if (state.trim()) addressParts.push(state.trim());
-    if (pincode.trim()) addressParts.push(pincode.trim());
+    if (sanitizedStreet) addressParts.push(sanitizedStreet);
+    if (sanitizedArea) addressParts.push(sanitizedArea);
+    if (sanitizedCity) addressParts.push(sanitizedCity);
+    if (sanitizedState) addressParts.push(sanitizedState);
+    if (sanitizedPincode) addressParts.push(sanitizedPincode);
 
     const combinedAddress =
       addressParts.length > 0 ? addressParts.join(", ") : "Location captured";
@@ -142,14 +184,14 @@ export default function ReportPage() {
         const { data, error } = await supabase.from("reports").insert([
           {
             reporter_id: getUserId(),
-            reporter_name: reporterName.trim() || getUserName(),
+            reporter_name: sanitizedReporterName || getUserName(),
             problem_type: selectedCategory,
-            description: description.trim(),
+            description: sanitizedDesc,
             photo_url: photoUrl,
             latitude: latitude,
             longitude: longitude,
             address: combinedAddress,
-            landmark: landmark.trim(),
+            landmark: sanitizedLandmark,
             status: "OPEN",
           },
         ]).select();
@@ -217,6 +259,18 @@ export default function ReportPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Anti-Bot Honeypot Trap (Invisible to humans, catches automated spambots) */}
+            <input
+              type="text"
+              name="hp_website_trap"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+              className="opacity-0 absolute -z-50 w-0 h-0 pointer-events-none select-none"
+              aria-hidden="true"
+            />
+
             {/* Step 1: Photo */}
             <div className="space-y-3">
               <label className="block text-sm font-bold text-pawAmber">
