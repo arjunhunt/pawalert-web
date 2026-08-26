@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dog, PlusCircle, MapPin, User, Navigation } from "lucide-react";
+import { Dog, PlusCircle, MapPin, User, Navigation, Trophy } from "lucide-react";
 
 interface NavbarProps {
   userLocation?: { lat: number; lng: number } | null;
@@ -71,6 +71,19 @@ export default function Navbar({
           >
             <PlusCircle className="w-4 h-4" />
             <span>Report Dog</span>
+          </Link>
+
+          {/* Leaderboard link */}
+          <Link
+            href="/leaderboard"
+            className={`p-2 rounded-xl border transition-colors ${
+              pathname === "/leaderboard"
+                ? "bg-pawAmber/20 text-pawAmber border-pawAmber/40"
+                : "bg-neutral-800/40 text-neutral-400 border-darkBorder hover:text-white hover:bg-neutral-800"
+            }`}
+            title="Community Leaderboard"
+          >
+            <Trophy className="w-5 h-5 text-amber-400" />
           </Link>
 
           {/* Profile link */}

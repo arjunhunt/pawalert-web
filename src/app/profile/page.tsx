@@ -20,8 +20,11 @@ import {
   Bell,
   Volume2,
   Navigation,
+  Trophy,
+  Share2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import AchievementCardModal from "@/components/AchievementCardModal";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import {
   isNotificationSupported,
@@ -43,6 +46,7 @@ export default function ProfilePage() {
   const [reportsMade, setReportsMade] = useState<number>(0);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [showKarmaModal, setShowKarmaModal] = useState<boolean>(false);
+  const [showAchievementCard, setShowAchievementCard] = useState<boolean>(false);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>("default");
   const [alertRadius, setAlertRadius] = useState<number>(10);
   const [testFired, setTestFired] = useState<boolean>(false);
@@ -323,6 +327,26 @@ export default function ProfilePage() {
             </button>
           </div>
 
+          {/* Quick Actions: Share Impact Card & View Leaderboard */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setShowAchievementCard(true)}
+              className="py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-pawAmber/20 transition-all active:scale-95"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>Share Impact Card</span>
+            </button>
+
+            <Link
+              href="/leaderboard"
+              className="py-3 px-4 rounded-2xl bg-darkBg hover:bg-neutral-800 border border-darkBorder hover:border-amber-500/40 text-neutral-200 font-bold text-xs flex items-center justify-center space-x-2 transition-all"
+            >
+              <Trophy className="w-4 h-4 text-amber-400" />
+              <span>City Leaderboard</span>
+            </Link>
+          </div>
+
           {/* Volunteer Badges */}
           <div className="space-y-3 pt-2 border-t border-darkBorder">
             <h3 className="text-xs font-bold text-pawAmber uppercase tracking-wider flex items-center space-x-1.5">
@@ -591,6 +615,18 @@ export default function ProfilePage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Shareable Achievement Card Modal */}
+      {showAchievementCard && (
+        <AchievementCardModal
+          volunteerName={name || "Community Feeder"}
+          dogsFed={dogsFed}
+          rescues={rescues}
+          reportsMade={reportsMade}
+          karmaPoints={karmaPoints}
+          onClose={() => setShowAchievementCard(false)}
+        />
       )}
     </div>
   );
