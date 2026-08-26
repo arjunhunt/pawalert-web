@@ -38,12 +38,12 @@ export default function MapView({
         const map = L.map(mapContainerRef.current).setView([centerLat, centerLng], 14);
         mapInstanceRef.current = map;
 
-        // Dark Map Tile Layer (CartoDB Dark Matter)
+        // OpenStreetMap Tile Layer (100% Free, High Precision, No Watermarks)
         L.tileLayer(
-          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
           {
             attribution:
-              '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap contributors',
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19,
           }
         ).addTo(map);
