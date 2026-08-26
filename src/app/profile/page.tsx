@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ShieldCheck,
@@ -12,14 +13,21 @@ import {
   Sparkles,
   Info,
   X,
-  Heart,
-  PlusCircle,
-  Stethoscope,
+  LogOut,
+  LogIn,
+  Mail,
+  CloudCheck,
+  User,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 
 export default function ProfilePage() {
+  const router = useRouter();
+
   const [name, setName] = useState<string>("");
+  const [email, setEmail] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [dogsFed, setDogsFed] = useState<number>(0);
   const [rescues, setRescues] = useState<number>(0);
   const [reportsMade, setReportsMade] = useState<number>(0);
@@ -27,7 +35,36 @@ export default function ProfilePage() {
   const [showKarmaModal, setShowKarmaModal] = useState<boolean>(false);
 
   useEffect(() => {
-    // Load individual user profile from browser storage
+    // Check Supabase Auth
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.getUser().then(async ({ data: { user } }) => {
+        if (user) {
+          setIsAuthenticated(true);
+          setEmail(user.email || null);
+
+          // Fetch cloud profile from Supabase
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .single();
+
+          if (profile) {
+            setName(profile.display_name);
+            setDogsFed(profile.dogs_fed);
+            setRescues(profile.rescues);
+            setReportsMade(profile.reports_made);
+            localStorage.setItem("pawalert_user_name", profile.display_name);
+            localStorage.setItem("pawalert_dogs_fed", profile.dogs_fed.toString());
+            localStorage.setItem("pawalert_rescues", profile.rescues.toString());
+            localStorage.setItem("pawalert_reports_made", profile.reports_made.toString());
+            return;
+          }
+        }
+      });
+    }
+
+    // Load local storage fallback
     const savedName = localStorage.getItem("pawalert_user_name");
     const savedFed = parseInt(localStorage.getItem("pawalert_dogs_fed") || "0", 10);
     const savedRescues = parseInt(localStorage.getItem("pawalert_rescues") || "0", 10);
@@ -57,13 +94,36 @@ export default function ProfilePage() {
 
   const karmaPoints = dogsFed * 30 + rescues * 100 + reportsMade * 50;
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
       localStorage.setItem("pawalert_user_name", name.trim());
+
+      // If authenticated, sync name to Supabase profile
+      if (isSupabaseConfigured && supabase && isAuthenticated) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from("profiles").upsert({
+            id: user.id,
+            display_name: name.trim(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 2500);
     }
+  };
+
+  const handleSignOut = async () => {
+    if (isSupabaseConfigured && supabase) {
+      await supabase.auth.signOut();
+    }
+    localStorage.removeItem("pawalert_auth_user_id");
+    setIsAuthenticated(false);
+    setEmail(null);
+    router.push("/auth");
   };
 
   const badges = [
@@ -98,29 +158,79 @@ export default function ProfilePage() {
       <Navbar />
 
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-8 space-y-6">
-        <Link
-          href="/"
-          className="inline-flex items-center space-x-2 text-neutral-400 hover:text-white text-xs font-semibold transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Live Feed</span>
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link
+            href="/"
+            className="inline-flex items-center space-x-2 text-neutral-400 hover:text-white text-xs font-semibold transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Live Feed</span>
+          </Link>
+
+          {isAuthenticated ? (
+            <button
+              onClick={handleSignOut}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-darkCard hover:bg-neutral-800 border border-darkBorder text-neutral-400 hover:text-red-400 text-xs font-semibold transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
+          ) : (
+            <Link
+              href="/auth"
+              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-pawAmber/15 hover:bg-pawAmber/25 border border-pawAmber/30 text-pawAmber text-xs font-bold transition-colors"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In / Create Account</span>
+            </Link>
+          )}
+        </div>
+
+        {/* Sync Status Banner for Guests */}
+        {!isAuthenticated && (
+          <div className="bg-amber-950/20 border border-amber-800/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div className="space-y-0.5">
+              <p className="font-bold text-amber-300 flex items-center space-x-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>Sync Karma Across All Your Devices</span>
+              </p>
+              <p className="text-neutral-400 text-[11px]">
+                Create a free account to keep your rescues, dogs fed, and karma safe on your phone and PC.
+              </p>
+            </div>
+            <Link
+              href="/auth"
+              className="px-3.5 py-1.5 rounded-xl bg-pawAmber hover:bg-pawAmber-hover text-white font-bold whitespace-nowrap shadow-md shadow-pawAmber/10"
+            >
+              Sign In Now →
+            </Link>
+          </div>
+        )}
 
         {/* Profile Card */}
         <div className="bg-darkCard border border-darkBorder rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
           {/* Avatar & Header */}
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 rounded-2xl bg-pawAmber/20 border border-pawAmber/30 flex items-center justify-center text-pawAmber">
-              <Dog className="w-8 h-8" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-white">
-                {name || "Community Feeder"}
-              </h1>
-              <p className="text-xs text-pawAmber font-semibold flex items-center space-x-1 mt-0.5">
-                <ShieldCheck className="w-4 h-4 text-green-400" />
-                <span>Verified Community Feeder</span>
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-16 h-16 rounded-2xl bg-pawAmber/20 border border-pawAmber/30 flex items-center justify-center text-pawAmber">
+                <Dog className="w-8 h-8" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black text-white">
+                  {name || "Community Feeder"}
+                </h1>
+                <div className="flex items-center space-x-2 mt-0.5">
+                  <p className="text-xs text-pawAmber font-semibold flex items-center space-x-1">
+                    <ShieldCheck className="w-4 h-4 text-green-400" />
+                    <span>Verified Feeder</span>
+                  </p>
+                  {email && (
+                    <span className="text-neutral-500 text-xs truncate max-w-[150px] sm:max-w-none">
+                      • {email}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -220,7 +330,7 @@ export default function ProfilePage() {
               {isSaved ? (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Saved to device!</span>
+                  <span>Saved to cloud & device!</span>
                 </>
               ) : (
                 <span>Save Volunteer Name</span>

@@ -1,7 +1,22 @@
 import { DogReport } from "./types";
+import { supabase, isSupabaseConfigured } from "./supabaseClient";
+
+export interface UserProfile {
+  id: string;
+  email?: string | null;
+  display_name: string;
+  dogs_fed: number;
+  rescues: number;
+  reports_made: number;
+  is_authenticated: boolean;
+}
 
 export function getUserId(): string {
   if (typeof window === "undefined") return "anonymous";
+  // Check if authenticated user ID is stored
+  const authId = localStorage.getItem("pawalert_auth_user_id");
+  if (authId) return authId;
+
   let userId = localStorage.getItem("pawalert_user_id");
   if (!userId) {
     userId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -73,4 +88,43 @@ export function isMyReport(report: DogReport | null): boolean {
   }
 
   return false;
+}
+
+/**
+ * Syncs stats with Supabase Cloud profile if user is logged in
+ */
+export async function syncStatsToCloud(
+  action: "DOG_FED" | "RESCUE" | "REPORT_MADE",
+  currentFed: number,
+  currentRescues: number,
+  currentReports: number
+): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    let updatedFed = currentFed;
+    let updatedRescues = currentRescues;
+    let updatedReports = currentReports;
+
+    if (action === "DOG_FED") updatedFed += 1;
+    if (action === "RESCUE") updatedRescues += 1;
+    if (action === "REPORT_MADE") updatedReports += 1;
+
+    await supabase
+      .from("profiles")
+      .upsert({
+        id: user.id,
+        email: user.email,
+        display_name: getUserName(),
+        dogs_fed: updatedFed,
+        rescues: updatedRescues,
+        reports_made: updatedReports,
+        updated_at: new Date().toISOString(),
+      });
+  } catch (e) {
+    console.warn("Could not sync to cloud profile", e);
+  }
 }

@@ -28,7 +28,7 @@ import CommentsSection from "@/components/CommentsSection";
 import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
 import { DEMO_REPORTS, supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { formatTimeAgo } from "@/lib/geo";
-import { isMyReport, removeMyReportId, getUserName } from "@/lib/user";
+import { isMyReport, removeMyReportId, getUserName, syncStatsToCloud } from "@/lib/user";
 
 // Dynamic map preview for detail screen
 const MapView = dynamic(() => import("@/components/MapView"), {
@@ -154,18 +154,22 @@ export default function AlertDetailPage() {
         .eq("id", id);
     }
 
-    // Increment personal user stats in localStorage
+    // Increment personal user stats in localStorage & Supabase Cloud
+    const curFed = parseInt(localStorage.getItem("pawalert_dogs_fed") || "0", 10);
+    const curRescues = parseInt(localStorage.getItem("pawalert_rescues") || "0", 10);
+    const curReports = parseInt(localStorage.getItem("pawalert_reports_made") || "0", 10);
+
     if (
       report.problem_type === "INJURED" ||
       report.problem_type === "SICK" ||
       report.problem_type === "STUCK" ||
       report.problem_type === "NEWBORN_LITTER"
     ) {
-      const rescues = parseInt(localStorage.getItem("pawalert_rescues") || "0", 10);
-      localStorage.setItem("pawalert_rescues", (rescues + 1).toString());
+      localStorage.setItem("pawalert_rescues", (curRescues + 1).toString());
+      syncStatsToCloud("RESCUE", curFed, curRescues, curReports);
     } else {
-      const fed = parseInt(localStorage.getItem("pawalert_dogs_fed") || "0", 10);
-      localStorage.setItem("pawalert_dogs_fed", (fed + 1).toString());
+      localStorage.setItem("pawalert_dogs_fed", (curFed + 1).toString());
+      syncStatsToCloud("DOG_FED", curFed, curRescues, curReports);
     }
 
     setReport(updated);

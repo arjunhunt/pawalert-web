@@ -16,7 +16,7 @@ import Navbar from "@/components/Navbar";
 import PhotoUpload from "@/components/PhotoUpload";
 import { ProblemType, PROBLEM_TYPE_LABELS } from "@/lib/types";
 import { reverseGeocodeDetailed } from "@/lib/geo";
-import { getUserId, getUserName, addMyReportId } from "@/lib/user";
+import { getUserId, getUserName, addMyReportId, syncStatsToCloud } from "@/lib/user";
 import {
   isSafeImageUrl,
   sanitizeText,
@@ -202,9 +202,12 @@ export default function ReportPage() {
           addMyReportId(data[0].id);
         }
 
-        // Increment user's reports counter in localStorage
+        // Increment user's reports counter in localStorage & Supabase Cloud
+        const curFed = parseInt(localStorage.getItem("pawalert_dogs_fed") || "0", 10);
+        const curRescues = parseInt(localStorage.getItem("pawalert_rescues") || "0", 10);
         const curReports = parseInt(localStorage.getItem("pawalert_reports_made") || "0", 10);
         localStorage.setItem("pawalert_reports_made", (curReports + 1).toString());
+        syncStatsToCloud("REPORT_MADE", curFed, curRescues, curReports);
 
         if (data && data[0]) {
           router.push(`/alert/${data[0].id}`);

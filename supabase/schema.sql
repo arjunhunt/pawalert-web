@@ -1,5 +1,5 @@
 -- ==============================================================================
--- PawAlert Hardened Supabase Database Schema
+-- PawAlert Complete Supabase Database Schema
 -- Run this in your Supabase Project -> SQL Editor
 -- ==============================================================================
 
@@ -25,7 +25,7 @@ create table if not exists public.reports (
     updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 3. Create high-performance compound indexes for fast geo, status, and feed querying
+-- 3. Create high-performance compound indexes
 create index if not exists idx_reports_status on public.reports (status);
 create index if not exists idx_reports_created_at on public.reports (created_at desc);
 create index if not exists idx_reports_coords on public.reports (latitude, longitude);
@@ -35,7 +35,6 @@ create index if not exists idx_reports_geo_status on public.reports (latitude, l
 -- 4. Enable Row Level Security (RLS)
 alter table public.reports enable row level security;
 
--- RLS Policies
 create policy "Allow public read access on reports" on public.reports for select using (true);
 create policy "Allow public insert on reports" on public.reports for insert with check (true);
 create policy "Allow public update on reports" on public.reports for update using (true);
@@ -62,7 +61,7 @@ create policy "Public Dog Photos Access" on storage.objects for select using (bu
 create policy "Public Dog Photos Upload" on storage.objects for insert with check (bucket_id = 'dog-photos');
 
 -- ==============================================================================
--- 7. Live Comments & Rescue Coordination Table with Security Bounds
+-- 7. Live Comments & Rescue Coordination Table
 -- ==============================================================================
 create table if not exists public.comments (
     id uuid primary key default uuid_generate_v4(),
@@ -84,3 +83,47 @@ create policy "Allow public insert on comments" on public.comments for insert wi
 create policy "Allow public delete on comments" on public.comments for delete using (true);
 
 alter publication supabase_realtime add table public.comments;
+
+-- ==============================================================================
+-- 8. Cloud Volunteer User Profiles & Cross-Device Karma Sync Table
+-- ==============================================================================
+create table if not exists public.profiles (
+    id uuid primary key references auth.users(id) on delete cascade,
+    email text,
+    display_name text not null default 'Community Feeder',
+    dogs_fed integer not null default 0 check (dogs_fed >= 0),
+    rescues integer not null default 0 check (rescues >= 0),
+    reports_made integer not null default 0 check (reports_made >= 0),
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.profiles enable row level security;
+
+create policy "Allow public read profiles" on public.profiles for select using (true);
+create policy "Allow user insert own profile" on public.profiles for insert with check (auth.uid() = id);
+create policy "Allow user update own profile" on public.profiles for update using (auth.uid() = id);
+
+-- Trigger to automatically create a profile whenever a new user signs up
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, email, display_name, dogs_fed, rescues, reports_made)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)),
+    0,
+    0,
+    0
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+-- Drop trigger if exists then recreate
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
