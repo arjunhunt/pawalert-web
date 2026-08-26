@@ -57,6 +57,11 @@ export default function AlertDetailPage() {
   useEffect(() => {
     setHelperName(getUserName());
 
+  const [isAuthor, setIsAuthor] = useState<boolean>(false);
+
+  useEffect(() => {
+    setHelperName(getUserName());
+
     const fetchSingleReport = async () => {
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase
@@ -67,6 +72,7 @@ export default function AlertDetailPage() {
 
         if (!error && data) {
           setReport(data as DogReport);
+          setIsAuthor(isMyReport(data as DogReport));
           return;
         }
       }
@@ -74,10 +80,17 @@ export default function AlertDetailPage() {
       // Fallback demo report finder
       const demo = DEMO_REPORTS.find((r) => r.id === id) || DEMO_REPORTS[0];
       setReport(demo);
+      setIsAuthor(isMyReport(demo));
     };
 
     if (id) fetchSingleReport();
   }, [id]);
+
+  useEffect(() => {
+    if (report) {
+      setIsAuthor(isMyReport(report));
+    }
+  }, [report]);
 
   // Handle escape key to close lightbox or delete modal
   useEffect(() => {
@@ -102,7 +115,6 @@ export default function AlertDetailPage() {
     );
   }
 
-  const isAuthor = isMyReport(report);
   const catInfo = PROBLEM_TYPE_LABELS[report.problem_type] || PROBLEM_TYPE_LABELS.OTHER;
   const statusInfo = STATUS_LABELS[report.status] || STATUS_LABELS.OPEN;
 
@@ -409,6 +421,20 @@ export default function AlertDetailPage() {
                 <div className="p-4 rounded-2xl bg-green-950/40 border border-green-800/50 text-green-300 text-sm font-bold flex items-center space-x-2.5">
                   <CheckCircle2 className="w-5 h-5 text-green-400" />
                   <span>This dog alert has been safely resolved by community volunteers! 🎉</span>
+                </div>
+              )}
+
+              {/* Creator Delete Section */}
+              {isAuthor && (
+                <div className="pt-3 border-t border-darkBorder/60">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteModal(true)}
+                    className="w-full py-3 rounded-2xl bg-red-950/30 hover:bg-red-950/60 text-red-400 border border-red-800/40 text-xs font-bold transition-all flex items-center justify-center space-x-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete This Alert (Author Only)</span>
+                  </button>
                 </div>
               )}
             </div>

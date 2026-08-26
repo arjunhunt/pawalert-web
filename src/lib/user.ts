@@ -49,13 +49,27 @@ export function isMyReport(report: DogReport | null): boolean {
   if (typeof window === "undefined") return false;
 
   const currentUserId = getUserId();
+  const currentUserName = getUserName();
+
+  // 1. Direct ID match
   if (report.reporter_id && report.reporter_id === currentUserId) return true;
 
+  // 2. Saved created list match
   try {
     const list = JSON.parse(localStorage.getItem("pawalert_my_report_ids") || "[]");
     if (list.includes(report.id)) return true;
   } catch (e) {
-    // Ignore JSON parse errors
+    // Ignore parse errors
+  }
+
+  // 3. Name match fallback
+  if (
+    report.reporter_name &&
+    currentUserName &&
+    report.reporter_name.trim().toLowerCase() === currentUserName.trim().toLowerCase() &&
+    report.reporter_name.trim().toLowerCase() !== "anonymous feeder"
+  ) {
+    return true;
   }
 
   return false;
