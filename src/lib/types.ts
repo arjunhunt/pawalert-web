@@ -28,6 +28,26 @@ export interface DogReport {
   updated_at: string;
 }
 
+export type CommentType = "UPDATE" | "ON_MY_WAY" | "FEEDING" | "VET_CONTACTED" | "GENERAL";
+
+export interface ReportComment {
+  id: string;
+  report_id: string;
+  author_id: string;
+  author_name: string;
+  content: string;
+  comment_type: CommentType;
+  created_at: string;
+}
+
+export const COMMENT_TYPE_TAGS: Record<CommentType, { label: string; icon: string; bg: string }> = {
+  ON_MY_WAY: { label: "On my way", icon: "🏃‍♂️", bg: "bg-blue-950/40 text-blue-400 border-blue-800/40" },
+  FEEDING: { label: "Bringing food", icon: "🍲", bg: "bg-amber-950/40 text-amber-400 border-amber-800/40" },
+  VET_CONTACTED: { label: "Contacted Vet", icon: "🩺", bg: "bg-red-950/40 text-red-400 border-red-800/40" },
+  UPDATE: { label: "Location/Spot update", icon: "📍", bg: "bg-purple-950/40 text-purple-400 border-purple-800/40" },
+  GENERAL: { label: "General Update", icon: "💬", bg: "bg-neutral-800/60 text-neutral-300 border-neutral-700/60" },
+};
+
 export const PROBLEM_TYPE_LABELS: Record<ProblemType, { label: string; icon: string; color: string }> = {
   HUNGRY: { label: "Hungry / Needs Food", icon: "🍖", color: "#EF6C00" },
   INJURED: { label: "Injured", icon: "🩹", color: "#E53935" },

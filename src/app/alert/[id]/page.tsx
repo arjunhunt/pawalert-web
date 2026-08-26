@@ -24,6 +24,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import CommentsSection from "@/components/CommentsSection";
 import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
 import { DEMO_REPORTS, supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { formatTimeAgo } from "@/lib/geo";
@@ -413,6 +414,9 @@ export default function AlertDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Live Rescue Updates & Community Comments */}
+        <CommentsSection reportId={report.id} reporterId={report.reporter_id} />
       </main>
 
       {/* Delete Confirmation Modal */}

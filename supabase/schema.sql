@@ -70,3 +70,27 @@ using (bucket_id = 'dog-photos');
 create policy "Public Dog Photos Upload"
 on storage.objects for insert
 with check (bucket_id = 'dog-photos');
+
+-- ==============================================================================
+-- 7. Live Comments & Rescue Coordination Table
+-- ==============================================================================
+create table if not exists public.comments (
+    id uuid primary key default uuid_generate_v4(),
+    report_id uuid references public.reports(id) on delete cascade not null,
+    author_id text not null default 'anonymous',
+    author_name text not null default 'Community Feeder',
+    content text not null,
+    comment_type text not null default 'GENERAL',
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_comments_report_id on public.comments (report_id);
+create index if not exists idx_comments_created_at on public.comments (created_at asc);
+
+alter table public.comments enable row level security;
+
+create policy "Allow public read access on comments" on public.comments for select using (true);
+create policy "Allow public insert on comments" on public.comments for insert with check (true);
+create policy "Allow public delete on comments" on public.comments for delete using (true);
+
+alter publication supabase_realtime add table public.comments;
