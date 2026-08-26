@@ -53,10 +53,6 @@ export default function AlertDetailPage() {
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
-
-  useEffect(() => {
-    setHelperName(getUserName());
-
   const [isAuthor, setIsAuthor] = useState<boolean>(false);
 
   useEffect(() => {
