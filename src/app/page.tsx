@@ -1,14 +1,29 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { LayoutGrid, Map, RefreshCw, Dog, PlusCircle, AlertCircle, Compass } from "lucide-react";
+import {
+  LayoutGrid,
+  Map,
+  RefreshCw,
+  Dog,
+  PlusCircle,
+  AlertCircle,
+  Compass,
+  ChevronDown,
+} from "lucide-react";
 import Navbar from "@/components/Navbar";
 import DogCard from "@/components/DogCard";
 import CategoryFilter from "@/components/CategoryFilter";
 import { DogReport, ProblemType, ReportStatus } from "@/lib/types";
-import { DEMO_REPORTS, supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { calculateDistanceMeters } from "@/lib/geo";
+
+// Global in-memory SWR cache for 0ms instant page loads
+let memoryReportsCache: DogReport[] | null = null;
+let memoryCacheTime: number = 0;
+const CACHE_TTL_MS = 30000; // 30 seconds
+const PAGE_SIZE = 30;
 
 // Dynamically import MapView to prevent SSR Leaflet window errors
 const MapView = dynamic(() => import("@/components/MapView"), {
@@ -22,32 +37,86 @@ const MapView = dynamic(() => import("@/components/MapView"), {
 });
 
 export default function Home() {
-  const [reports, setReports] = useState<DogReport[]>([]);
+  const [reports, setReports] = useState<DogReport[]>(() => memoryReportsCache || []);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<ProblemType | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<"ACTIVE" | "ALL">("ACTIVE");
   const [viewMode, setViewMode] = useState<"feed" | "map">("feed");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [page, setPage] = useState<number>(0);
 
-  // Fetch live reports from Supabase
-  const fetchReports = async () => {
+  // Fetch live reports from Supabase with pagination & in-memory caching
+  const fetchReports = useCallback(async (isRefresh: boolean = false) => {
+    const now = Date.now();
+    if (!isRefresh && memoryReportsCache && now - memoryCacheTime < CACHE_TTL_MS) {
+      setReports(memoryReportsCache);
+      return;
+    }
+
     setIsLoading(true);
     try {
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase
           .from("reports")
           .select("*")
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .range(0, PAGE_SIZE - 1);
 
         if (!error && data) {
-          setReports(data as DogReport[]);
+          const loaded = data as DogReport[];
+          setReports(loaded);
+          memoryReportsCache = loaded;
+          memoryCacheTime = Date.now();
+          setPage(0);
+          setHasMore(loaded.length >= PAGE_SIZE);
         }
       }
     } catch (e) {
       console.warn("Could not load from Supabase", e);
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  // Load more reports (infinite pagination)
+  const loadMoreReports = async () => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+
+    const nextPage = page + 1;
+    const from = nextPage * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    try {
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from("reports")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(from, to);
+
+        if (!error && data) {
+          const newItems = data as DogReport[];
+          if (newItems.length < PAGE_SIZE) {
+            setHasMore(false);
+          }
+          setReports((prev) => {
+            const existingIds = new Set(prev.map((r) => r.id));
+            const unique = newItems.filter((r) => !existingIds.has(r.id));
+            const updated = [...prev, ...unique];
+            memoryReportsCache = updated;
+            return updated;
+          });
+          setPage(nextPage);
+        }
+      }
+    } catch (e) {
+      console.error("Load more failed", e);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -85,15 +154,25 @@ export default function Home() {
           { event: "*", schema: "public", table: "reports" },
           (payload) => {
             if (payload.eventType === "INSERT") {
-              setReports((prev) => [payload.new as DogReport, ...prev]);
+              setReports((prev) => {
+                const updated = [payload.new as DogReport, ...prev.filter((r) => r.id !== payload.new.id)];
+                memoryReportsCache = updated;
+                return updated;
+              });
             } else if (payload.eventType === "UPDATE") {
-              setReports((prev) =>
-                prev.map((r) =>
+              setReports((prev) => {
+                const updated = prev.map((r) =>
                   r.id === payload.new.id ? (payload.new as DogReport) : r
-                )
-              );
+                );
+                memoryReportsCache = updated;
+                return updated;
+              });
             } else if (payload.eventType === "DELETE") {
-              setReports((prev) => prev.filter((r) => r.id !== payload.old.id));
+              setReports((prev) => {
+                const updated = prev.filter((r) => r.id !== payload.old.id);
+                memoryReportsCache = updated;
+                return updated;
+              });
             }
           }
         )
@@ -103,7 +182,7 @@ export default function Home() {
         supabase?.removeChannel(channel);
       };
     }
-  }, []);
+  }, [fetchReports]);
 
   // Filter and sort reports nearest first
   const filteredReports = useMemo(() => {
@@ -113,10 +192,12 @@ export default function Home() {
         if (selectedStatus === "ACTIVE") {
           if (report.status === "RESOLVED") return false;
         }
+
         // Category filter
-        if (selectedCategory !== null) {
-          if (report.problem_type !== selectedCategory) return false;
+        if (selectedCategory && report.problem_type !== selectedCategory) {
+          return false;
         }
+
         return true;
       })
       .map((report) => {
@@ -132,9 +213,11 @@ export default function Home() {
         return { report, distance };
       })
       .sort((a, b) => {
+        // If distances are available, sort closest first
         if (a.distance !== null && b.distance !== null) {
           return a.distance - b.distance;
         }
+        // Otherwise sort newest first
         return (
           new Date(b.report.created_at).getTime() -
           new Date(a.report.created_at).getTime()
@@ -144,99 +227,81 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-darkBg">
-      {/* Top Navigation */}
-      <Navbar
-        userLocation={userLocation}
-        onDetectLocation={detectLocation}
-        isLocating={isLocating}
-      />
+      <Navbar />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
-        {/* Supabase Notice Banner if demo fallback */}
-        {!isSupabaseConfigured && (
-          <div className="bg-pawAmber/10 border border-pawAmber/30 rounded-2xl p-4 flex items-center justify-between text-xs sm:text-sm text-neutral-200">
-            <div className="flex items-center space-x-2.5">
-              <AlertCircle className="w-5 h-5 text-pawAmber shrink-0" />
-              <span>
-                <b>Demo Mode Active:</b> Link your Supabase project keys to activate live global database sync.
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* View Switcher & Header Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-darkBorder">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-white flex items-center space-x-2">
-              <span>Live Stray Dog Alerts</span>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-pawAmber/20 text-pawAmber border border-pawAmber/30">
-                {filteredReports.length} {filteredReports.length === 1 ? "Dog" : "Dogs"}
-              </span>
-            </h2>
-            <p className="text-xs sm:text-sm text-neutral-400 mt-0.5">
-              {userLocation
-                ? "Sorted by nearest distance from your GPS location"
-                : "Enable GPS to sort alerts closest to you"}
-            </p>
+        {/* Top Control Bar */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-darkCard/80 backdrop-blur-md p-4 rounded-3xl border border-darkBorder">
+          {/* Status Tabs */}
+          <div className="flex items-center space-x-1 bg-darkBg p-1 rounded-2xl border border-darkBorder">
+            <button
+              onClick={() => setSelectedStatus("ACTIVE")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                selectedStatus === "ACTIVE"
+                  ? "bg-pawAmber text-white shadow-md shadow-pawAmber/20"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Needs Help (Active)
+            </button>
+            <button
+              onClick={() => setSelectedStatus("ALL")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                selectedStatus === "ALL"
+                  ? "bg-neutral-800 text-white"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              All Alerts
+            </button>
           </div>
 
-          <div className="flex items-center space-x-2 self-start sm:self-auto">
-            {/* Active vs All status filter */}
-            <div className="bg-darkCard p-1 rounded-xl border border-darkBorder flex items-center text-xs font-semibold">
-              <button
-                onClick={() => setSelectedStatus("ACTIVE")}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
-                  selectedStatus === "ACTIVE"
-                    ? "bg-pawAmber text-white font-bold"
-                    : "text-neutral-400 hover:text-white"
-                }`}
-              >
-                Needs Action
-              </button>
-              <button
-                onClick={() => setSelectedStatus("ALL")}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
-                  selectedStatus === "ALL"
-                    ? "bg-pawAmber text-white font-bold"
-                    : "text-neutral-400 hover:text-white"
-                }`}
-              >
-                All Reports
-              </button>
-            </div>
+          {/* Location & View Controls */}
+          <div className="flex items-center space-x-2 w-full sm:w-auto justify-between sm:justify-end">
+            <button
+              onClick={detectLocation}
+              disabled={isLocating}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-2xl bg-darkBg hover:bg-neutral-800 border border-darkBorder text-xs text-neutral-300 transition-colors"
+              title="Update your GPS location"
+            >
+              <Compass className={`w-4 h-4 text-pawAmber ${isLocating ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">
+                {userLocation ? "GPS Locked" : "Detect GPS"}
+              </span>
+            </button>
 
             {/* View Mode Toggle: Feed vs Map */}
-            <div className="bg-darkCard p-1 rounded-xl border border-darkBorder flex items-center text-xs">
+            <div className="flex items-center space-x-1 bg-darkBg p-1 rounded-2xl border border-darkBorder">
               <button
                 onClick={() => setViewMode("feed")}
-                className={`p-1.5 rounded-lg transition-colors ${
+                className={`p-2 rounded-xl transition-all ${
                   viewMode === "feed"
-                    ? "bg-neutral-700 text-white"
+                    ? "bg-pawAmber text-white shadow-md shadow-pawAmber/20"
                     : "text-neutral-400 hover:text-white"
                 }`}
-                title="Card Feed View"
+                title="Feed View"
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode("map")}
-                className={`p-1.5 rounded-lg transition-colors ${
+                className={`p-2 rounded-xl transition-all ${
                   viewMode === "map"
-                    ? "bg-neutral-700 text-white"
+                    ? "bg-pawAmber text-white shadow-md shadow-pawAmber/20"
                     : "text-neutral-400 hover:text-white"
                 }`}
-                title="Interactive Map View"
+                title="Map View"
               >
                 <Map className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Refresh Button */}
+            {/* Manual Refresh */}
             <button
-              onClick={fetchReports}
+              onClick={() => fetchReports(true)}
               disabled={isLoading}
-              className="p-2.5 rounded-xl bg-darkCard hover:bg-darkCardHover text-neutral-300 border border-darkBorder transition-all"
-              title="Refresh feed"
+              className="p-2 rounded-2xl bg-darkBg hover:bg-neutral-800 border border-darkBorder text-neutral-400 hover:text-white transition-colors"
+              title="Refresh alerts"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-pawAmber" : ""}`} />
             </button>
@@ -290,14 +355,30 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredReports.map(({ report, distance }) => (
-              <DogCard
-                key={report.id}
-                report={report}
-                distanceMeters={distance}
-              />
-            ))}
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredReports.map(({ report, distance }) => (
+                <DogCard
+                  key={report.id}
+                  report={report}
+                  distanceMeters={distance}
+                />
+              ))}
+            </div>
+
+            {/* Load More Pagination Button */}
+            {hasMore && (
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={loadMoreReports}
+                  disabled={isLoadingMore}
+                  className="flex items-center space-x-2 px-6 py-3 rounded-2xl bg-darkCard hover:bg-darkCardHover border border-darkBorder hover:border-pawAmber/40 text-neutral-200 text-xs sm:text-sm font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
+                >
+                  <ChevronDown className={`w-4 h-4 text-pawAmber ${isLoadingMore ? "animate-bounce" : ""}`} />
+                  <span>{isLoadingMore ? "Loading more alerts..." : "Load More Alerts"}</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>

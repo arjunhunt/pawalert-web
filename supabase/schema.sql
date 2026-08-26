@@ -25,10 +25,12 @@ create table if not exists public.reports (
     updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 3. Create index for fast geo and status querying
+-- 3. Create high-performance compound indexes for fast geo, status, and feed querying
 create index if not exists idx_reports_status on public.reports (status);
 create index if not exists idx_reports_created_at on public.reports (created_at desc);
 create index if not exists idx_reports_coords on public.reports (latitude, longitude);
+create index if not exists idx_reports_active_feed on public.reports (status, created_at desc);
+create index if not exists idx_reports_geo_status on public.reports (latitude, longitude, status);
 
 -- 4. Enable Row Level Security (RLS)
 alter table public.reports enable row level security;
