@@ -1,5 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  themeColor: "#ea580c",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export const metadata: Metadata = {
   title: "PawAlert - Community Stray Dog Welfare Network",
@@ -7,7 +15,13 @@ export const metadata: Metadata = {
     "Real-time alerts connecting local feeders and dog lovers with stray dogs needing food, medical care, and rescue.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "PawAlert",
   },
 };
 

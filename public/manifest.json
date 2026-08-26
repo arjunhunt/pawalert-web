@@ -1,16 +1,43 @@
 {
-  "name": "PawAlert - Community Dog Welfare",
+  "name": "PawAlert - Stray Dog Rescue & Feeding Network",
   "short_name": "PawAlert",
-  "description": "Connecting community dog lovers and feeders with stray dogs needing food, medicine, and rescue.",
+  "description": "Real-time community stray dog feeding, distress alerts, and emergency rescue network.",
   "start_url": "/",
+  "id": "/",
   "display": "standalone",
-  "background_color": "#141210",
-  "theme_color": "#EF6C00",
+  "background_color": "#121212",
+  "theme_color": "#ea580c",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
   "icons": [
     {
-      "src": "/icon.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["social", "utilities", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "Report Dog",
+      "short_name": "Report",
+      "description": "Broadcast an urgent stray dog alert",
+      "url": "/report",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Profile & Karma",
+      "short_name": "Profile",
+      "description": "View your volunteer badges and karma",
+      "url": "/profile",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
     }
   ]
 }

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#261b11" />
+      <stop offset="100%" stop-color="#120c06" />
+    </linearGradient>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c" />
+      <stop offset="100%" stop-color="#ea580c" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- App Icon Background Container with Rounded Squircle -->
+  <rect width="512" height="512" rx="120" fill="url(#bgGrad)" stroke="#ea580c" stroke-width="8" stroke-opacity="0.4"/>
+
+  <!-- Glowing Aura -->
+  <circle cx="256" cy="256" r="140" fill="#ea580c" opacity="0.15" filter="url(#glow)"/>
+
+  <!-- PawAlert Dog Silhouette -->
+  <g transform="translate(106, 106) scale(0.585)" fill="none" stroke="url(#amberGrad)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Dog Body & Face (Lucide Dog Path) -->
+    <path d="M10 5v4a2 2 0 0 0 2 2 2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 0-2-2V5" fill="#ea580c" fill-opacity="0.2" />
+    <path d="M18 5v4a2 2 0 0 1-2 2 2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V9a2 2 0 0 1 2-2V5" fill="#ea580c" fill-opacity="0.2" />
+    <path d="M4 11V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4" />
+    <path d="M7 15v1a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3v-1" />
+    <path d="M9 11v.01" stroke-width="32" stroke="#fb923c" />
+    <path d="M15 11v.01" stroke-width="32" stroke="#fb923c" />
+    <path d="M11 15h2" stroke-width="28" stroke="#fb923c" />
+    <!-- Paw Pad -->
+    <circle cx="256" cy="380" r="40" fill="url(#amberGrad)" />
+    <circle cx="190" cy="310" r="24" fill="url(#amberGrad)" />
+    <circle cx="256" cy="280" r="26" fill="url(#amberGrad)" />
+    <circle cx="322" cy="310" r="24" fill="url(#amberGrad)" />
+  </g>
+</svg>

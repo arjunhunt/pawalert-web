@@ -15,6 +15,7 @@ import {
 import Navbar from "@/components/Navbar";
 import DogCard from "@/components/DogCard";
 import NotificationBanner from "@/components/NotificationBanner";
+import InstallPwaPrompt from "@/components/InstallPwaPrompt";
 import CategoryFilter from "@/components/CategoryFilter";
 import { DogReport, ProblemType, ReportStatus } from "@/lib/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
@@ -419,6 +420,9 @@ export default function Home() {
           <span>Open Source Community Project</span>
         </div>
       </footer>
+
+      {/* PWA 1-Click Install Prompt */}
+      <InstallPwaPrompt />
     </div>
   );
 }
