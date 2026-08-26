@@ -48,7 +48,7 @@ export function setAlertRadiusKm(km: number): void {
 }
 
 /**
- * Synthesizes an attention-grabbing, loud, and crisp emergency distress alarm chime using Web Audio API
+ * Synthesizes a loud, piercing, high-volume emergency rescue alarm using Web Audio API + Dynamic Compressor
  */
 export function playEmergencyChime(): void {
   if (typeof window === "undefined") return;
@@ -63,46 +63,66 @@ export function playEmergencyChime(): void {
     }
     const now = ctx.currentTime;
 
-    // Helper to play a crisp, loud harmonic tone pulse
-    const playTone = (freq1: number, freq2: number, startTime: number, duration: number, vol: number = 0.8) => {
-      // Primary clear tone (triangle for crisp punchiness)
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(freq1, startTime);
-      osc.frequency.exponentialRampToValueAtTime(freq2, startTime + duration);
+    // Master Dynamic Range Compressor for maximum perceived volume on phone speakers
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-18, now);
+    compressor.knee.setValueAtTime(40, now);
+    compressor.ratio.setValueAtTime(14, now);
+    compressor.attack.setValueAtTime(0.002, now);
+    compressor.release.setValueAtTime(0.15, now);
 
-      gain.gain.setValueAtTime(vol, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+    // Master Boost Gain Node
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(1.4, now);
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+    masterGain.connect(compressor);
+    compressor.connect(ctx.destination);
 
-      osc.start(startTime);
-      osc.stop(startTime + duration);
+    // Helper to play an urgent, piercing emergency pulse
+    const playUrgentPulse = (startFreq: number, endFreq: number, startTime: number, duration: number) => {
+      // 1. Sawtooth wave (maximum brightness and acoustic cut-through)
+      const oscSaw = ctx.createOscillator();
+      const gainSaw = ctx.createGain();
+      oscSaw.type = "sawtooth";
+      oscSaw.frequency.setValueAtTime(startFreq, startTime);
+      oscSaw.frequency.exponentialRampToValueAtTime(endFreq, startTime + duration);
 
-      // Warm harmonic sine backing
-      const oscSub = ctx.createOscillator();
-      const gainSub = ctx.createGain();
-      oscSub.type = "sine";
-      oscSub.frequency.setValueAtTime(freq1 * 0.5, startTime);
+      gainSaw.gain.setValueAtTime(0.65, startTime);
+      gainSaw.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
 
-      gainSub.gain.setValueAtTime(vol * 0.4, startTime);
-      gainSub.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+      oscSaw.connect(gainSaw);
+      gainSaw.connect(masterGain);
 
-      oscSub.connect(gainSub);
-      gainSub.connect(ctx.destination);
+      oscSaw.start(startTime);
+      oscSaw.stop(startTime + duration);
 
-      oscSub.start(startTime);
-      oscSub.stop(startTime + duration);
+      // 2. Square wave (punchy attack bite)
+      const oscSq = ctx.createOscillator();
+      const gainSq = ctx.createGain();
+      oscSq.type = "square";
+      oscSq.frequency.setValueAtTime(startFreq * 1.5, startTime);
+      oscSq.frequency.exponentialRampToValueAtTime(endFreq * 1.5, startTime + duration);
+
+      gainSq.gain.setValueAtTime(0.4, startTime);
+      gainSq.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+
+      oscSq.connect(gainSq);
+      gainSq.connect(masterGain);
+
+      oscSq.start(startTime);
+      oscSq.stop(startTime + duration);
     };
 
-    // 🚨 3-Pulse Urgent Distress Alert Sequence: Beep - Beep - BEEP!
-    playTone(659.25, 880.0, now, 0.18, 0.75);         // E5 -> A5
-    playTone(783.99, 1046.5, now + 0.22, 0.18, 0.8);   // G5 -> C6
-    playTone(1046.5, 1318.5, now + 0.44, 0.28, 0.9);   // C6 -> E6 (High alert climax)
+    // 🚨 Urgent 4-Pulse Emergency Ambulance / Rescue Siren Pattern (1.1s total)
+    // Double-pulse 1 (High attention)
+    playUrgentPulse(880, 1400, now, 0.16);
+    playUrgentPulse(987, 1600, now + 0.18, 0.16);
+
+    // Double-pulse 2 (High climax)
+    playUrgentPulse(1046, 1760, now + 0.45, 0.18);
+    playUrgentPulse(1318, 2093, now + 0.68, 0.3);
   } catch (e) {
-    console.warn("Audio chime error:", e);
+    console.warn("Audio alarm error:", e);
   }
 }
 
