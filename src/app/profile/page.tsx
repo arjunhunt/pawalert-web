@@ -166,6 +166,7 @@ export default function ProfilePage() {
         reporter_name: "PawAlert Volunteer",
         problem_type: "INJURED",
         description: "Test notification: Injured pup spotted near market. Emergency response ready!",
+        photo_url: "https://images.unsplash.com/photo-1543466835-00a7907e9de1",
         landmark: "Central Market Road",
         latitude: 28.6139,
         longitude: 77.209,
