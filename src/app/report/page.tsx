@@ -3,12 +3,53 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Send, MapPin, Navigation, Dog, CheckCircle, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft,
+  Send,
+  MapPin,
+  Navigation,
+  Dog,
+  AlertTriangle,
+  Compass,
+} from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PhotoUpload from "@/components/PhotoUpload";
 import { ProblemType, PROBLEM_TYPE_LABELS } from "@/lib/types";
-import { reverseGeocode } from "@/lib/geo";
+import { reverseGeocodeDetailed } from "@/lib/geo";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
+
+const INDIAN_STATES = [
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Delhi",
+  "Other / Union Territory",
+];
 
 export default function ReportPage() {
   const router = useRouter();
@@ -17,10 +58,17 @@ export default function ReportPage() {
   const [selectedCategory, setSelectedCategory] = useState<ProblemType>("HUNGRY");
   const [description, setDescription] = useState<string>("");
   const [reporterName, setReporterName] = useState<string>("Community Feeder");
+
+  // Granular Location States
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
-  const [address, setAddress] = useState<string>("");
+  const [pincode, setPincode] = useState<string>("");
+  const [area, setArea] = useState<string>("");
+  const [street, setStreet] = useState<string>("");
   const [landmark, setLandmark] = useState<string>("");
+  const [city, setCity] = useState<string>("");
+  const [state, setState] = useState<string>("Gujarat");
+
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -43,9 +91,13 @@ export default function ReportPage() {
         setLongitude(lng);
         setIsLocating(false);
 
-        // Reverse geocode to street address
-        const detected = await reverseGeocode(lat, lng);
-        setAddress((prev) => (prev.trim() === "" ? detected : prev));
+        // Reverse geocode to detailed structured address
+        const details = await reverseGeocodeDetailed(lat, lng);
+        if (details.pincode && !pincode) setPincode(details.pincode);
+        if (details.area && !area) setArea(details.area);
+        if (details.street && !street) setStreet(details.street);
+        if (details.city && !city) setCity(details.city);
+        if (details.state && !state) setState(details.state);
       },
       (err) => {
         console.warn("GPS error:", err);
@@ -73,6 +125,17 @@ export default function ReportPage() {
     setIsSubmitting(true);
     setErrorMessage("");
 
+    // Build formatted full address
+    const addressParts: string[] = [];
+    if (street.trim()) addressParts.push(street.trim());
+    if (area.trim()) addressParts.push(area.trim());
+    if (city.trim()) addressParts.push(city.trim());
+    if (state.trim()) addressParts.push(state.trim());
+    if (pincode.trim()) addressParts.push(pincode.trim());
+
+    const combinedAddress =
+      addressParts.length > 0 ? addressParts.join(", ") : "Location captured";
+
     try {
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase.from("reports").insert([
@@ -84,7 +147,7 @@ export default function ReportPage() {
             photo_url: photoUrl,
             latitude: latitude,
             longitude: longitude,
-            address: address.trim() || "Location captured",
+            address: combinedAddress,
             landmark: landmark.trim(),
             status: "OPEN",
           },
@@ -200,15 +263,22 @@ export default function ReportPage() {
               />
             </div>
 
-            {/* Step 4: Location & Landmark */}
+            {/* Step 4: Structured Location Form */}
             <div className="space-y-4">
-              <label className="block text-sm font-bold text-pawAmber">
-                4. Location & Landmark *
-              </label>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-pawAmber uppercase tracking-wider">
+                    4. Exact Location & Address *
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    Be as precise as possible — this helps volunteers find the dog on ground.
+                  </p>
+                </div>
+              </div>
 
-              <div className="bg-darkBg border border-darkBorder rounded-2xl p-4 space-y-4">
-                {/* GPS Status & Detector */}
-                <div className="flex items-center justify-between">
+              <div className="bg-darkBg border border-darkBorder rounded-2xl p-5 space-y-4">
+                {/* GPS Auto-Detect Bar */}
+                <div className="flex items-center justify-between pb-3 border-b border-darkBorder">
                   <div className="flex items-center space-x-2">
                     <MapPin className={`w-5 h-5 ${latitude ? "text-green-400" : "text-neutral-500"}`} />
                     <div>
@@ -234,32 +304,100 @@ export default function ReportPage() {
                   </button>
                 </div>
 
-                {/* Editable Street Address */}
+                {/* Pincode */}
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-400 mb-1">
-                    Area / Locality / Street Address
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                    Pincode *
                   </label>
                   <input
                     type="text"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="e.g. Devdham, Umargam"
-                    className="w-full bg-darkCard border border-darkBorder rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value)}
+                    placeholder="e.g. 396170"
+                    required
+                    className="w-full bg-darkCard border border-darkBorder rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
                   />
                 </div>
 
-                {/* Landmark Input */}
+                {/* Area / Locality */}
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-400 mb-1">
-                    Specific Landmark / Spot Details (Optional)
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                    Area / Locality *
+                  </label>
+                  <input
+                    type="text"
+                    value={area}
+                    onChange={(e) => setArea(e.target.value)}
+                    placeholder="e.g. Patilpada, Sector 12, Station Road"
+                    required
+                    className="w-full bg-darkCard border border-darkBorder rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
+                  />
+                  <p className="text-[11px] text-neutral-500 mt-1">Neighbourhood or locality name</p>
+                </div>
+
+                {/* Exact location / Street */}
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                    Exact location / Street *
+                  </label>
+                  <input
+                    type="text"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    placeholder="e.g. Near MG Road Metro Station, Main Bazar Road"
+                    required
+                    className="w-full bg-darkCard border border-darkBorder rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
+                  />
+                  <p className="text-[11px] text-neutral-500 mt-1">Street name or nearest identifiable spot</p>
+                </div>
+
+                {/* Additional details / Landmark */}
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                    Additional details / Landmark (Optional)
                   </label>
                   <input
                     type="text"
                     value={landmark}
                     onChange={(e) => setLandmark(e.target.value)}
-                    placeholder="e.g. Near Sharma tea stall, opposite blue gate, under banyan tree"
-                    className="w-full bg-darkCard border border-darkBorder rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
+                    placeholder="e.g. Opposite State Bank, behind bus stand, 2nd lane, under banyan tree"
+                    className="w-full bg-darkCard border border-darkBorder rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
                   />
+                  <p className="text-[11px] text-neutral-500 mt-1">Any extra info to help locate the exact spot quickly</p>
+                </div>
+
+                {/* City & State Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                      City / Town *
+                    </label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="e.g. Umargam, Mumbai"
+                      required
+                      className="w-full bg-darkCard border border-darkBorder rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                      State *
+                    </label>
+                    <select
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      className="w-full bg-darkCard border border-darkBorder rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 focus:outline-none focus:border-pawAmber"
+                    >
+                      {INDIAN_STATES.map((st) => (
+                        <option key={st} value={st} className="bg-neutral-900 text-white">
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -274,7 +412,7 @@ export default function ReportPage() {
                 value={reporterName}
                 onChange={(e) => setReporterName(e.target.value)}
                 placeholder="e.g. Arjun (Dog Lover)"
-                className="w-full bg-darkBg border border-darkBorder rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
+                className="w-full bg-darkBg border border-darkBorder rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
               />
             </div>
 

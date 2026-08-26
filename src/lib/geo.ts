@@ -48,7 +48,20 @@ export function formatTimeAgo(timestampString: string): string {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export async function reverseGeocode(lat: number, lng: number): Promise<string> {
+export interface DetailedAddress {
+  pincode: string;
+  area: string;
+  street: string;
+  landmark: string;
+  city: string;
+  state: string;
+  fullAddress: string;
+}
+
+export async function reverseGeocodeDetailed(
+  lat: number,
+  lng: number
+): Promise<DetailedAddress> {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
@@ -60,18 +73,48 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     );
     if (!res.ok) throw new Error("Geocoding failed");
     const data = await res.json();
-    const address = data.address || {};
+    const addr = data.address || {};
+
+    const pincode = addr.postcode || "";
+    const area = addr.suburb || addr.neighbourhood || addr.residential || "";
+    const street = addr.road || addr.pedestrian || addr.footway || "";
+    const city = addr.city || addr.town || addr.village || addr.county || "";
+    const state = addr.state || "";
+
     const parts: string[] = [];
+    if (street) parts.push(street);
+    if (area) parts.push(area);
+    if (city) parts.push(city);
+    if (state) parts.push(state);
 
-    if (address.road || address.suburb) parts.push(address.road || address.suburb);
-    if (address.neighbourhood) parts.push(address.neighbourhood);
-    if (address.city || address.town || address.village) {
-      parts.push(address.city || address.town || address.village);
-    }
-    if (address.state) parts.push(address.state);
+    const fullAddress =
+      parts.length > 0
+        ? parts.join(", ")
+        : data.display_name || `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
 
-    return parts.length > 0 ? parts.join(", ") : data.display_name || `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+    return {
+      pincode,
+      area,
+      street,
+      landmark: "",
+      city,
+      state,
+      fullAddress,
+    };
   } catch (e) {
-    return `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+    return {
+      pincode: "",
+      area: "",
+      street: "",
+      landmark: "",
+      city: "",
+      state: "",
+      fullAddress: `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`,
+    };
   }
+}
+
+export async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const detailed = await reverseGeocodeDetailed(lat, lng);
+  return detailed.fullAddress;
 }
