@@ -17,6 +17,9 @@ import {
   Compass,
   Dog,
   ExternalLink,
+  Maximize2,
+  X,
+  ZoomIn,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
@@ -43,6 +46,7 @@ export default function AlertDetailPage() {
   const [helperName, setHelperName] = useState<string>("Community Feeder");
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [shareCopied, setShareCopied] = useState<boolean>(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const savedName = localStorage.getItem("pawalert_user_name");
@@ -69,6 +73,15 @@ export default function AlertDetailPage() {
 
     if (id) fetchSingleReport();
   }, [id]);
+
+  // Handle escape key to close lightbox
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsLightboxOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   if (!report) {
     return (
@@ -125,7 +138,12 @@ export default function AlertDetailPage() {
     }
 
     // Increment personal user stats in localStorage
-    if (report.problem_type === "INJURED" || report.problem_type === "SICK" || report.problem_type === "STUCK" || report.problem_type === "NEWBORN_LITTER") {
+    if (
+      report.problem_type === "INJURED" ||
+      report.problem_type === "SICK" ||
+      report.problem_type === "STUCK" ||
+      report.problem_type === "NEWBORN_LITTER"
+    ) {
       const rescues = parseInt(localStorage.getItem("pawalert_rescues") || "0", 10);
       localStorage.setItem("pawalert_rescues", (rescues + 1).toString());
     } else {
@@ -188,14 +206,37 @@ export default function AlertDetailPage() {
         {/* Main Alert Card */}
         <div className="bg-darkCard border border-darkBorder rounded-3xl overflow-hidden shadow-2xl space-y-6">
           {/* Photo & Badges */}
-          <div className="relative w-full h-72 sm:h-96 bg-neutral-900">
+          <div
+            onClick={() => report.photo_url && setIsLightboxOpen(true)}
+            className={`relative w-full h-72 sm:h-96 bg-neutral-900 overflow-hidden ${
+              report.photo_url ? "cursor-zoom-in group" : ""
+            }`}
+          >
             {report.photo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={report.photo_url}
-                alt={catInfo.label}
-                className="w-full h-full object-cover"
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={report.photo_url}
+                  alt={catInfo.label}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+
+                {/* Hover overlay hint */}
+                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                  <div className="bg-black/80 backdrop-blur-md px-3.5 py-2 rounded-xl text-white text-xs font-bold flex items-center space-x-2 border border-white/20 shadow-2xl">
+                    <ZoomIn className="w-4 h-4 text-pawAmber" />
+                    <span>Tap to view full uncropped photo</span>
+                  </div>
+                </div>
+
+                {/* Bottom-Right Zoom Pill */}
+                <div className="absolute bottom-4 right-4 pointer-events-none">
+                  <span className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-black/70 backdrop-blur-md border border-white/15">
+                    <Maximize2 className="w-3.5 h-3.5 text-pawAmber" />
+                    <span>Zoom</span>
+                  </span>
+                </div>
+              </>
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-neutral-500">
                 <Dog className="w-16 h-16 text-pawAmber/30 mb-2" />
@@ -204,7 +245,7 @@ export default function AlertDetailPage() {
             )}
 
             {/* Top-Left: Status Badge */}
-            <div className="absolute top-4 left-4">
+            <div className="absolute top-4 left-4 pointer-events-none">
               <span
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold uppercase tracking-wide border backdrop-blur-md shadow-lg ${statusInfo.bg}`}
               >
@@ -330,6 +371,52 @@ export default function AlertDetailPage() {
           </div>
         </div>
       </main>
+
+      {/* Fullscreen Scalable Image Lightbox Modal */}
+      {isLightboxOpen && report.photo_url && (
+        <div
+          onClick={() => setIsLightboxOpen(false)}
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200"
+        >
+          {/* Close Button Header */}
+          <div className="w-full max-w-4xl flex items-center justify-between pb-3 text-white">
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-pawAmber/20 text-pawAmber border border-pawAmber/30">
+                {catInfo.label}
+              </span>
+              <span className="text-xs text-neutral-400 truncate max-w-[200px] sm:max-w-md">
+                {report.address}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsLightboxOpen(false)}
+              className="p-2 rounded-full bg-neutral-800/80 hover:bg-neutral-700 text-white transition-colors"
+              title="Close (Esc)"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Full Scalable Image */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-4xl max-h-[85vh] w-full flex items-center justify-center overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={report.photo_url}
+              alt={catInfo.label}
+              className="max-w-full max-h-[85vh] w-auto h-auto object-contain rounded-2xl select-none"
+            />
+          </div>
+
+          <p className="text-neutral-500 text-xs mt-3">
+            Click anywhere or press Esc to close
+          </p>
+        </div>
+      )}
     </div>
   );
 }
