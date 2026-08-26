@@ -35,14 +35,15 @@ export default function ProfilePage() {
 
   useEffect(() => {
     // Check Supabase Auth
-    if (isSupabaseConfigured && supabase) {
-      supabase.auth.getUser().then(async ({ data: { user } }) => {
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.auth.getUser().then(async ({ data: { user } }) => {
         if (user) {
           setIsAuthenticated(true);
           setEmail(user.email || null);
 
           // Fetch cloud profile from Supabase
-          const { data: profile } = await supabase
+          const { data: profile } = await client
             .from("profiles")
             .select("*")
             .eq("id", user.id)
@@ -99,10 +100,11 @@ export default function ProfilePage() {
       localStorage.setItem("pawalert_user_name", name.trim());
 
       // If authenticated, sync name to Supabase profile
-      if (isSupabaseConfigured && supabase && isAuthenticated) {
-        const { data: { user } } = await supabase.auth.getUser();
+      const client = supabase;
+      if (isSupabaseConfigured && client && isAuthenticated) {
+        const { data: { user } } = await client.auth.getUser();
         if (user) {
-          await supabase.from("profiles").upsert({
+          await client.from("profiles").upsert({
             id: user.id,
             display_name: name.trim(),
             updated_at: new Date().toISOString(),
@@ -116,8 +118,9 @@ export default function ProfilePage() {
   };
 
   const handleSignOut = async () => {
-    if (isSupabaseConfigured && supabase) {
-      await supabase.auth.signOut();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      await client.auth.signOut();
     }
     localStorage.removeItem("pawalert_auth_user_id");
     setIsAuthenticated(false);
