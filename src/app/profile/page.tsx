@@ -9,6 +9,12 @@ import {
   CheckCircle2,
   Dog,
   Lock,
+  Sparkles,
+  Info,
+  X,
+  Heart,
+  PlusCircle,
+  Stethoscope,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
@@ -18,6 +24,7 @@ export default function ProfilePage() {
   const [rescues, setRescues] = useState<number>(0);
   const [reportsMade, setReportsMade] = useState<number>(0);
   const [isSaved, setIsSaved] = useState<boolean>(false);
+  const [showKarmaModal, setShowKarmaModal] = useState<boolean>(false);
 
   useEffect(() => {
     // Load individual user profile from browser storage
@@ -37,6 +44,15 @@ export default function ProfilePage() {
     setDogsFed(savedFed);
     setRescues(savedRescues);
     setReportsMade(savedReports);
+  }, []);
+
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowKarmaModal(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const karmaPoints = dogsFed * 30 + rescues * 100 + reportsMade * 50;
@@ -122,14 +138,25 @@ export default function ProfilePage() {
                 Rescues
               </div>
             </div>
-            <div className="bg-darkBg border border-darkBorder rounded-2xl p-4 text-center">
-              <div className="text-2xl font-black text-amber-400">
-                {karmaPoints}
+
+            {/* Clickable Karma Points Card */}
+            <button
+              type="button"
+              onClick={() => setShowKarmaModal(true)}
+              className="bg-darkBg hover:bg-amber-950/20 border border-darkBorder hover:border-amber-500/40 rounded-2xl p-4 text-center transition-all group relative cursor-pointer active:scale-95"
+              title="Click to learn how Karma Points work"
+            >
+              <div className="flex items-center justify-center space-x-1">
+                <span className="text-2xl font-black text-amber-400 group-hover:scale-105 transition-transform">
+                  {karmaPoints}
+                </span>
+                <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
               </div>
-              <div className="text-[11px] text-neutral-400 font-semibold mt-1">
-                Karma Pts
+              <div className="text-[11px] text-amber-300 font-bold mt-1 flex items-center justify-center space-x-1">
+                <span>Karma Pts</span>
+                <Info className="w-3 h-3 text-amber-400/80" />
               </div>
-            </div>
+            </button>
           </div>
 
           {/* Volunteer Badges */}
@@ -202,6 +229,128 @@ export default function ProfilePage() {
           </form>
         </div>
       </main>
+
+      {/* Karma Points Explanation Modal */}
+      {showKarmaModal && (
+        <div
+          onClick={() => setShowKarmaModal(false)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-darkCard border border-darkBorder rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-6 shadow-2xl animate-in zoom-in-95 duration-150 relative"
+          >
+            {/* Close Icon Button */}
+            <button
+              type="button"
+              onClick={() => setShowKarmaModal(false)}
+              className="absolute top-5 right-5 p-2 rounded-full bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="space-y-1 pr-8">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="w-6 h-6 text-amber-400" />
+                <h3 className="text-xl font-black text-white">
+                  What are Karma Points?
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-400">
+                Karma Points represent your community kindness score for helping, feeding, and rescuing stray dogs on PawAlert!
+              </p>
+            </div>
+
+            {/* How to Earn Points Cards */}
+            <div className="space-y-2.5">
+              <h4 className="text-[11px] font-bold text-pawAmber uppercase tracking-wider">
+                How to Earn Karma Points
+              </h4>
+
+              {/* +100 Rescues */}
+              <div className="p-3.5 rounded-2xl bg-darkBg border border-green-800/40 flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-green-950/60 flex items-center justify-center text-xl shrink-0">
+                  🚑
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white text-xs">
+                      Rescuing Injured / Sick Dogs
+                    </span>
+                    <span className="text-xs font-black px-2 py-0.5 rounded-md bg-green-950/60 text-green-400 border border-green-800/50">
+                      +100 Pts
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    Claim and resolve alerts for injured, sick, or trapped dogs.
+                  </p>
+                </div>
+              </div>
+
+              {/* +50 Reports */}
+              <div className="p-3.5 rounded-2xl bg-darkBg border border-blue-800/40 flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-950/60 flex items-center justify-center text-xl shrink-0">
+                  📢
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white text-xs">
+                      Broadcasting Distress Alerts
+                    </span>
+                    <span className="text-xs font-black px-2 py-0.5 rounded-md bg-blue-950/60 text-blue-400 border border-blue-800/50">
+                      +50 Pts
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    Spot a stray dog in need and broadcast a GPS location alert.
+                  </p>
+                </div>
+              </div>
+
+              {/* +30 Feeding */}
+              <div className="p-3.5 rounded-2xl bg-darkBg border border-amber-800/40 flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-950/60 flex items-center justify-center text-xl shrink-0">
+                  🍲
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white text-xs">
+                      Feeding Stray Dogs
+                    </span>
+                    <span className="text-xs font-black px-2 py-0.5 rounded-md bg-amber-950/60 text-amber-400 border border-amber-800/50">
+                      +30 Pts
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    Help hungry community dogs by resolving food alerts.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Current Formula Breakdown */}
+            <div className="p-3.5 rounded-2xl bg-amber-950/20 border border-amber-800/30 text-xs text-amber-200 space-y-1">
+              <div className="font-bold text-[11px] uppercase tracking-wider text-amber-400">
+                Your Current Score Calculation:
+              </div>
+              <div className="text-xs text-neutral-300 font-mono">
+                ({rescues} Rescues × 100) + ({reportsMade} Alerts × 50) + ({dogsFed} Fed × 30) ={" "}
+                <b className="text-amber-400">{karmaPoints} Karma Points</b>
+              </div>
+            </div>
+
+            {/* Dismiss Button */}
+            <button
+              type="button"
+              onClick={() => setShowKarmaModal(false)}
+              className="w-full py-3.5 rounded-xl bg-pawAmber hover:bg-pawAmber-hover text-white text-xs sm:text-sm font-bold shadow-lg shadow-pawAmber/20 transition-all text-center"
+            >
+              Got it, keep helping dogs! 🐾
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
