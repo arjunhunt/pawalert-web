@@ -121,7 +121,7 @@ export default function AchievementCardModal({
             </h3>
             <p className="text-xs text-green-400 font-semibold flex items-center justify-center space-x-1">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Verified Stray Dog Protector</span>
+              <span>Verified Volunteer</span>
             </p>
           </div>
 
