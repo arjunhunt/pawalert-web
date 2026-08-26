@@ -6,13 +6,11 @@ import {
   ArrowLeft,
   ShieldCheck,
   Award,
-  Database,
   CheckCircle2,
   Dog,
   Lock,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { isSupabaseConfigured } from "@/lib/supabaseClient";
 
 export default function ProfilePage() {
   const [name, setName] = useState<string>("");
@@ -202,42 +200,6 @@ export default function ProfilePage() {
               )}
             </button>
           </form>
-
-          {/* Supabase Connection Post-Deploy Status */}
-          <div className="pt-2 border-t border-darkBorder space-y-2">
-            <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider flex items-center space-x-1.5">
-              <Database className="w-4 h-4" />
-              <span>Backend Cloud Status</span>
-            </h3>
-
-            <div
-              className={`p-4 rounded-2xl border text-xs ${
-                isSupabaseConfigured
-                  ? "bg-green-950/20 border-green-800/40 text-green-300"
-                  : "bg-darkBg border-darkBorder text-neutral-300"
-              }`}
-            >
-              <div className="font-bold mb-1 flex items-center space-x-1.5">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    isSupabaseConfigured
-                      ? "bg-green-400 animate-ping"
-                      : "bg-pawAmber"
-                  }`}
-                />
-                <span>
-                  {isSupabaseConfigured
-                    ? "Connected to Supabase Cloud"
-                    : "Demo Mode (Local Data)"}
-                </span>
-              </div>
-              <p className="text-[11px] text-neutral-400">
-                {isSupabaseConfigured
-                  ? "Live WebSocket alerts, PostgreSQL, and Storage are active."
-                  : "To connect your Supabase database, set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY on Vercel."}
-              </p>
-            </div>
-          </div>
         </div>
       </main>
     </div>
