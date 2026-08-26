@@ -48,6 +48,11 @@ create policy "Allow public update on reports"
 on public.reports for update
 using (true);
 
+-- Allow author/public to delete reports
+create policy "Allow public delete on reports"
+on public.reports for delete
+using (true);
+
 -- 5. Enable Realtime updates
 alter publication supabase_realtime add table public.reports;
 

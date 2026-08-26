@@ -16,6 +16,7 @@ import Navbar from "@/components/Navbar";
 import PhotoUpload from "@/components/PhotoUpload";
 import { ProblemType, PROBLEM_TYPE_LABELS } from "@/lib/types";
 import { reverseGeocodeDetailed } from "@/lib/geo";
+import { getUserId, getUserName, addMyReportId } from "@/lib/user";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 
 const INDIAN_STATES = [
@@ -140,8 +141,8 @@ export default function ReportPage() {
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase.from("reports").insert([
           {
-            reporter_id: "user-" + Math.random().toString(36).substring(7),
-            reporter_name: reporterName.trim() || "Anonymous Feeder",
+            reporter_id: getUserId(),
+            reporter_name: reporterName.trim() || getUserName(),
             problem_type: selectedCategory,
             description: description.trim(),
             photo_url: photoUrl,
@@ -154,6 +155,10 @@ export default function ReportPage() {
         ]).select();
 
         if (error) throw error;
+
+        if (data && data[0]) {
+          addMyReportId(data[0].id);
+        }
 
         // Increment user's reports counter in localStorage
         const curReports = parseInt(localStorage.getItem("pawalert_reports_made") || "0", 10);

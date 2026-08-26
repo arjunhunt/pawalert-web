@@ -20,11 +20,14 @@ import {
   Maximize2,
   X,
   ZoomIn,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
 import { DEMO_REPORTS, supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { formatTimeAgo } from "@/lib/geo";
+import { isMyReport, removeMyReportId, getUserName } from "@/lib/user";
 
 // Dynamic map preview for detail screen
 const MapView = dynamic(() => import("@/components/MapView"), {
@@ -47,10 +50,11 @@ export default function AlertDetailPage() {
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [shareCopied, setShareCopied] = useState<boolean>(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   useEffect(() => {
-    const savedName = localStorage.getItem("pawalert_user_name");
-    if (savedName) setHelperName(savedName);
+    setHelperName(getUserName());
 
     const fetchSingleReport = async () => {
       if (isSupabaseConfigured && supabase) {
@@ -74,10 +78,13 @@ export default function AlertDetailPage() {
     if (id) fetchSingleReport();
   }, [id]);
 
-  // Handle escape key to close lightbox
+  // Handle escape key to close lightbox or delete modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsLightboxOpen(false);
+      if (e.key === "Escape") {
+        setIsLightboxOpen(false);
+        setShowDeleteModal(false);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -94,13 +101,14 @@ export default function AlertDetailPage() {
     );
   }
 
+  const isAuthor = isMyReport(report);
   const catInfo = PROBLEM_TYPE_LABELS[report.problem_type] || PROBLEM_TYPE_LABELS.OTHER;
   const statusInfo = STATUS_LABELS[report.status] || STATUS_LABELS.OPEN;
 
   // Claim report
   const handleClaim = async () => {
     setIsUpdating(true);
-    const activeName = localStorage.getItem("pawalert_user_name") || helperName || "Community Feeder";
+    const activeName = getUserName() || helperName || "Community Feeder";
     const updated = {
       ...report,
       status: "IN_PROGRESS" as const,
@@ -162,6 +170,21 @@ export default function AlertDetailPage() {
     });
   };
 
+  // Delete report
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      if (isSupabaseConfigured && supabase) {
+        await supabase.from("reports").delete().eq("id", id);
+      }
+      removeMyReportId(id);
+      router.push("/");
+    } catch (e) {
+      console.error("Delete failed", e);
+      setIsDeleting(false);
+    }
+  };
+
   // Share alert
   const handleShare = () => {
     if (navigator.share) {
@@ -194,13 +217,28 @@ export default function AlertDetailPage() {
             <span>Back to Alerts Feed</span>
           </Link>
 
-          <button
-            onClick={handleShare}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-darkCard hover:bg-darkCardHover border border-darkBorder text-neutral-200 text-xs font-semibold transition-colors"
-          >
-            <Share2 className="w-4 h-4 text-pawAmber" />
-            <span>{shareCopied ? "Link Copied!" : "Share Alert"}</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            {/* Creator Delete Button */}
+            {isAuthor && (
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 text-xs font-semibold transition-colors"
+                title="Delete this alert (You created this)"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Alert</span>
+              </button>
+            )}
+
+            {/* Share Button */}
+            <button
+              onClick={handleShare}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-darkCard hover:bg-darkCardHover border border-darkBorder text-neutral-200 text-xs font-semibold transition-colors"
+            >
+              <Share2 className="w-4 h-4 text-pawAmber" />
+              <span>{shareCopied ? "Link Copied!" : "Share Alert"}</span>
+            </button>
+          </div>
         </div>
 
         {/* Main Alert Card */}
@@ -282,6 +320,11 @@ export default function AlertDetailPage() {
               <User className="w-4 h-4 text-pawAmber" />
               <span>
                 Reported by <b className="text-white">{report.reporter_name}</b>
+                {isAuthor && (
+                  <span className="ml-2 px-2 py-0.5 rounded-md bg-pawAmber/20 text-pawAmber font-bold text-[10px]">
+                    You created this
+                  </span>
+                )}
               </span>
             </div>
 
@@ -371,6 +414,51 @@ export default function AlertDetailPage() {
           </div>
         </div>
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div
+          onClick={() => setShowDeleteModal(false)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-darkCard border border-darkBorder rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl animate-in zoom-in-95 duration-150"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-red-950/50 border border-red-800/50 flex items-center justify-center text-red-400 mx-auto">
+              <AlertTriangle className="w-7 h-7" />
+            </div>
+
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-black text-white">Delete this Alert?</h3>
+              <p className="text-xs sm:text-sm text-neutral-400">
+                Are you sure you want to delete this dog report? It will be permanently removed from the live feed and map for all community volunteers.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="py-3 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold transition-colors"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg shadow-red-600/20 transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isDeleting ? "Deleting..." : "Yes, Delete"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Fullscreen Scalable Image Lightbox Modal */}
       {isLightboxOpen && report.photo_url && (
