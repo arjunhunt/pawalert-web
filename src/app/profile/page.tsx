@@ -16,7 +16,6 @@ import {
   LogOut,
   LogIn,
   Mail,
-  CloudCheck,
   User,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
