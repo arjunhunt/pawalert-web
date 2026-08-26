@@ -1,6 +1,6 @@
 /**
  * PawAlert Enterprise Security Utilities
- * Protects against XSS, script injection, bot flooding, and invalid payloads.
+ * Protects against XSS, script injection, bot flooding, scam links, and invalid payloads.
  */
 
 export function isSafeImageUrl(url: string): boolean {
@@ -62,4 +62,11 @@ export function checkRateLimit(
 
   localStorage.setItem(storageKey, now.toString());
   return { allowed: true, remainingSec: 0 };
+}
+
+// Anti-Phishing & Spam Link Detector
+export function containsSuspiciousLinks(text: string): boolean {
+  if (!text) return false;
+  const suspiciousPattern = /(bit\.ly|tinyurl\.com|t\.me\/|free-crypto|earn-money|casin|poker|whatsapp\.com\/channel)/i;
+  return suspiciousPattern.test(text);
 }
