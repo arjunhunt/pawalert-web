@@ -17,9 +17,20 @@ import {
   LogIn,
   Mail,
   User,
+  Bell,
+  Volume2,
+  Navigation,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
+import {
+  isNotificationSupported,
+  getNotificationPermission,
+  requestNotificationPermission,
+  getAlertRadiusKm,
+  setAlertRadiusKm,
+  sendProximityAlert,
+} from "@/lib/notifications";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -32,8 +43,16 @@ export default function ProfilePage() {
   const [reportsMade, setReportsMade] = useState<number>(0);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [showKarmaModal, setShowKarmaModal] = useState<boolean>(false);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>("default");
+  const [alertRadius, setAlertRadius] = useState<number>(10);
+  const [testFired, setTestFired] = useState<boolean>(false);
 
   useEffect(() => {
+    if (isNotificationSupported()) {
+      setNotifPermission(getNotificationPermission());
+    }
+    setAlertRadius(getAlertRadiusKm());
+
     // Check Supabase Auth
     const client = supabase;
     if (isSupabaseConfigured && client) {
@@ -126,6 +145,38 @@ export default function ProfilePage() {
     setIsAuthenticated(false);
     setEmail(null);
     router.push("/auth");
+  };
+
+  const handleEnableNotifications = async () => {
+    const perm = await requestNotificationPermission();
+    setNotifPermission(perm);
+  };
+
+  const handleRadiusChange = (km: number) => {
+    setAlertRadius(km);
+    setAlertRadiusKm(km);
+  };
+
+  const handleTestNotification = () => {
+    setTestFired(true);
+    sendProximityAlert(
+      {
+        id: "demo-test-alert",
+        reporter_id: "test",
+        reporter_name: "PawAlert Volunteer",
+        problem_type: "INJURED",
+        description: "Test notification: Injured pup spotted near market. Emergency response ready!",
+        landmark: "Central Market Road",
+        latitude: 28.6139,
+        longitude: 77.209,
+        address: "Central Market",
+        status: "OPEN",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      850 // 850 meters away
+    );
+    setTimeout(() => setTestFired(false), 3000);
   };
 
   const badges = [
@@ -301,6 +352,83 @@ export default function ProfilePage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Emergency Proximity Notifications Settings */}
+          <div className="space-y-4 pt-2 border-t border-darkBorder">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-pawAmber uppercase tracking-wider flex items-center space-x-1.5">
+                <Bell className="w-4 h-4" />
+                <span>Emergency Distress Notifications</span>
+              </h3>
+
+              {notifPermission === "granted" ? (
+                <span className="px-2.5 py-1 rounded-full bg-green-950/60 border border-green-800/50 text-green-300 text-[10px] font-bold flex items-center space-x-1">
+                  <CheckCircle2 className="w-3 h-3 text-green-400" />
+                  <span>Active & Ready</span>
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-400 text-[10px] font-bold">
+                  Notifications Inactive
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs text-neutral-400">
+              Get an instant phone notification, vibration, and emergency audio chime whenever a dog is reported in distress nearby.
+            </p>
+
+            {/* Permission Prompt Button if not granted */}
+            {notifPermission !== "granted" && (
+              <button
+                type="button"
+                onClick={handleEnableNotifications}
+                className="w-full py-2.5 rounded-xl bg-pawAmber hover:bg-pawAmber-hover text-white text-xs font-bold transition-all shadow-md shadow-pawAmber/20 flex items-center justify-center space-x-2"
+              >
+                <Bell className="w-4 h-4" />
+                <span>Allow Emergency Notifications on this Device</span>
+              </button>
+            )}
+
+            {/* Radius Selector */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-neutral-300">
+                Notification Distance Radius:
+              </label>
+              <div className="grid grid-cols-4 gap-2 text-xs">
+                {[
+                  { km: 2, label: "2 km", sub: "Local" },
+                  { km: 5, label: "5 km", sub: "Colony" },
+                  { km: 10, label: "10 km", sub: "City" },
+                  { km: 25, label: "25 km", sub: "Wide" },
+                ].map((item) => (
+                  <button
+                    key={item.km}
+                    type="button"
+                    onClick={() => handleRadiusChange(item.km)}
+                    className={`p-2 rounded-xl border text-center transition-all ${
+                      alertRadius === item.km
+                        ? "bg-pawAmber/20 border-pawAmber text-pawAmber font-bold shadow-md shadow-pawAmber/10"
+                        : "bg-darkBg border-darkBorder text-neutral-400 hover:text-white"
+                    }`}
+                  >
+                    <div className="font-bold text-xs">{item.label}</div>
+                    <div className="text-[10px] opacity-75">{item.sub}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Test Alert Button */}
+            <button
+              type="button"
+              onClick={handleTestNotification}
+              disabled={testFired}
+              className="flex items-center justify-center space-x-2 w-full py-2.5 rounded-xl bg-darkBg hover:bg-neutral-800 border border-darkBorder text-neutral-200 text-xs font-bold transition-all"
+            >
+              <Volume2 className={`w-4 h-4 text-pawAmber ${testFired ? "animate-bounce text-green-400" : ""}`} />
+              <span>{testFired ? "🔔 Testing Chime & Vibration..." : "Test Notification & Emergency Chime"}</span>
+            </button>
           </div>
 
           {/* Edit Profile Form */}

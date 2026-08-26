@@ -14,10 +14,12 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import DogCard from "@/components/DogCard";
+import NotificationBanner from "@/components/NotificationBanner";
 import CategoryFilter from "@/components/CategoryFilter";
 import { DogReport, ProblemType, ReportStatus } from "@/lib/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { calculateDistanceMeters } from "@/lib/geo";
+import { sendProximityAlert, getAlertRadiusKm } from "@/lib/notifications";
 
 // Global in-memory SWR cache for 0ms instant page loads
 let memoryReportsCache: DogReport[] | null = null;
@@ -47,6 +49,7 @@ export default function Home() {
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [page, setPage] = useState<number>(0);
+  const [incomingAlert, setIncomingAlert] = useState<{ report: DogReport; distanceMeters: number | null } | null>(null);
 
   // Fetch live reports from Supabase with pagination & in-memory caching
   const fetchReports = useCallback(async (isRefresh: boolean = false) => {
@@ -154,11 +157,31 @@ export default function Home() {
           { event: "*", schema: "public", table: "reports" },
           (payload) => {
             if (payload.eventType === "INSERT") {
+              const newReport = payload.new as DogReport;
               setReports((prev) => {
-                const updated = [payload.new as DogReport, ...prev.filter((r) => r.id !== payload.new.id)];
+                const updated = [newReport, ...prev.filter((r) => r.id !== newReport.id)];
                 memoryReportsCache = updated;
                 return updated;
               });
+
+              // Check proximity and trigger sound + notification
+              let distM: number | null = null;
+              if (userLocation && newReport.latitude && newReport.longitude) {
+                distM = calculateDistanceMeters(
+                  userLocation.lat,
+                  userLocation.lng,
+                  newReport.latitude,
+                  newReport.longitude
+                );
+              }
+
+              const maxRadiusKm = getAlertRadiusKm();
+              const withinRadius = distM === null || maxRadiusKm === 0 || distM <= maxRadiusKm * 1000;
+
+              if (withinRadius) {
+                sendProximityAlert(newReport, distM);
+                setIncomingAlert({ report: newReport, distanceMeters: distM });
+              }
             } else if (payload.eventType === "UPDATE") {
               setReports((prev) => {
                 const updated = prev.map((r) =>
@@ -230,6 +253,12 @@ export default function Home() {
       <Navbar />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
+        {/* Proximity Distress Alert Notifications & Permission Prompt */}
+        <NotificationBanner
+          incomingAlert={incomingAlert}
+          onDismissAlert={() => setIncomingAlert(null)}
+        />
+
         {/* Top Control Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-darkCard/80 backdrop-blur-md p-4 rounded-3xl border border-darkBorder">
           {/* Status Tabs */}
