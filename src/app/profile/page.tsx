@@ -280,7 +280,7 @@ export default function ProfilePage() {
                 <div className="flex items-center space-x-2 mt-0.5">
                   <p className="text-xs text-pawAmber font-semibold flex items-center space-x-1">
                     <ShieldCheck className="w-4 h-4 text-green-400" />
-                    <span>Verified Feeder</span>
+                    <span>Verified</span>
                   </p>
                   {email && (
                     <span className="text-neutral-500 text-xs truncate max-w-[150px] sm:max-w-none">
