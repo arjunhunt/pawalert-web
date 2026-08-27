@@ -100,10 +100,16 @@ export function playEmergencyChime(): void {
       oscHarmonic.stop(startTime + duration);
     };
 
-    // 🎵 Melodic Ascending Crystal Triad: A5 (880Hz) -> C#6 (1108Hz) -> E6 (1318Hz)
-    playBellNote(880.0, now, 0.45, 0.4);         // A5
-    playBellNote(1108.73, now + 0.14, 0.45, 0.45); // C#6
-    playBellNote(1318.51, now + 0.28, 0.65, 0.5);  // E6 (Long soothing resonance)
+    // 🎵 Melodic Dual-Phrase Crystal Bell Sequence (~2.5s total duration)
+    // Phrase 1 (Ascending Chime)
+    playBellNote(880.0, now, 0.55, 0.45);          // A5
+    playBellNote(1108.73, now + 0.2, 0.55, 0.48);  // C#6
+    playBellNote(1318.51, now + 0.4, 0.7, 0.52);   // E6
+
+    // Phrase 2 (Uplifting Response & Sparkling Sustain)
+    playBellNote(880.0, now + 0.85, 0.5, 0.4);     // A5
+    playBellNote(1318.51, now + 1.05, 0.6, 0.48);  // E6
+    playBellNote(1760.0, now + 1.25, 1.2, 0.55);   // A6 (High sparkling crystal resolve with long warm resonance)
   } catch (e) {
     console.warn("Audio chime error:", e);
   }
@@ -112,7 +118,7 @@ export function playEmergencyChime(): void {
 /**
  * Triggers punchy phone vibration if supported
  */
-export function vibrateDevice(pattern: number[] = [300, 100, 300, 100, 500]): void {
+export function vibrateDevice(pattern: number[] = [200, 100, 200, 250, 200, 100, 400]): void {
   if (typeof window !== "undefined" && "navigator" in window && navigator.vibrate) {
     try {
       navigator.vibrate(pattern);
