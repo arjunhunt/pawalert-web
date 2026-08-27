@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import AchievementCardModal from "@/components/AchievementCardModal";
+import ShareAppModal from "@/components/ShareAppModal";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import {
   isNotificationSupported,
@@ -47,6 +48,7 @@ export default function ProfilePage() {
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [showKarmaModal, setShowKarmaModal] = useState<boolean>(false);
   const [showAchievementCard, setShowAchievementCard] = useState<boolean>(false);
+  const [showShareAppModal, setShowShareAppModal] = useState<boolean>(false);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>("default");
   const [alertRadius, setAlertRadius] = useState<number>(10);
   const [testFired, setTestFired] = useState<boolean>(false);
@@ -347,6 +349,16 @@ export default function ProfilePage() {
             </Link>
           </div>
 
+          {/* Invite Volunteers & Share App Banner Button */}
+          <button
+            type="button"
+            onClick={() => setShowShareAppModal(true)}
+            className="w-full py-3 px-4 rounded-2xl bg-darkBg hover:bg-pawAmber/10 border border-pawAmber/40 text-pawAmber font-bold text-xs flex items-center justify-center space-x-2 transition-all active:scale-98"
+          >
+            <Dog className="w-4 h-4" />
+            <span>📲 Invite Volunteers & Share PawAlert App</span>
+          </button>
+
           {/* Volunteer Badges */}
           <div className="space-y-3 pt-2 border-t border-darkBorder">
             <h3 className="text-xs font-bold text-pawAmber uppercase tracking-wider flex items-center space-x-1.5">
@@ -627,6 +639,11 @@ export default function ProfilePage() {
           karmaPoints={karmaPoints}
           onClose={() => setShowAchievementCard(false)}
         />
+      )}
+
+      {/* Share PawAlert App Modal */}
+      {showShareAppModal && (
+        <ShareAppModal onClose={() => setShowShareAppModal(false)} />
       )}
     </div>
   );
