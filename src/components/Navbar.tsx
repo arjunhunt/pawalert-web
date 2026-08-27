@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dog, PlusCircle, MapPin, User, Navigation, Trophy, Share2 } from "lucide-react";
-import ShareAppModal from "@/components/ShareAppModal";
+import { Dog, PlusCircle, MapPin, User, Navigation, Trophy } from "lucide-react";
 
 interface NavbarProps {
   userLocation?: { lat: number; lng: number } | null;
@@ -18,7 +16,6 @@ export default function Navbar({
   isLocating,
 }: NavbarProps) {
   const pathname = usePathname();
-  const [showShareModal, setShowShareModal] = useState<boolean>(false);
 
   return (
     <header className="sticky top-0 z-50 bg-darkCard/90 backdrop-blur-md border-b border-darkBorder">
@@ -76,16 +73,6 @@ export default function Navbar({
             <span>Report Dog</span>
           </Link>
 
-          {/* Share PawAlert App Button */}
-          <button
-            type="button"
-            onClick={() => setShowShareModal(true)}
-            className="p-2 rounded-xl bg-pawAmber/10 hover:bg-pawAmber/20 border border-pawAmber/30 text-pawAmber hover:text-amber-300 transition-all hover:scale-105 active:scale-95"
-            title="Share PawAlert App"
-          >
-            <Share2 className="w-5 h-5" />
-          </button>
-
           {/* Leaderboard link */}
           <Link
             href="/leaderboard"
@@ -113,11 +100,6 @@ export default function Navbar({
           </Link>
         </div>
       </div>
-
-      {/* Share PawAlert App Modal */}
-      {showShareModal && (
-        <ShareAppModal onClose={() => setShowShareModal(false)} />
-      )}
     </header>
   );
 }
