@@ -28,6 +28,14 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
   },
+  {
+    key: "Cross-Origin-Opener-Policy",
+    value: "same-origin-allow-popups",
+  },
+  {
+    key: "Cross-Origin-Resource-Policy",
+    value: "cross-origin",
+  },
 ];
 
 const nextConfig = {
