@@ -22,10 +22,14 @@ import {
   ZoomIn,
   Trash2,
   AlertTriangle,
+  Stethoscope,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import CommentsSection from "@/components/CommentsSection";
-import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
+import PawMedicTriageCard from "@/components/PawMedicTriageCard";
+import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS, PawMedicResult } from "@/lib/types";
 import { DEMO_REPORTS, supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { formatTimeAgo } from "@/lib/geo";
 import { isMyReport, removeMyReportId, getUserName, syncStatsToCloud, isAdmin } from "@/lib/user";
@@ -55,6 +59,33 @@ export default function AlertDetailPage() {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isAuthor, setIsAuthor] = useState<boolean>(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
+  const [pawmedicDiagnosis, setPawmedicDiagnosis] = useState<PawMedicResult | null>(null);
+  const [isPawMedicScanning, setIsPawMedicScanning] = useState<boolean>(false);
+
+  const triggerPawMedicTriage = async (targetReport: DogReport) => {
+    if (!targetReport) return;
+    setIsPawMedicScanning(true);
+    try {
+      const res = await fetch("/api/pawmedic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          photoUrl: targetReport.photo_url,
+          problemType: targetReport.problem_type,
+          userNotes: targetReport.description,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        setPawmedicDiagnosis(json.data);
+      }
+    } catch (e) {
+      console.warn("PawMedic triage fetch failed:", e);
+    } finally {
+      setIsPawMedicScanning(false);
+    }
+  };
 
   useEffect(() => {
     setHelperName(getUserName());
@@ -340,6 +371,54 @@ export default function AlertDetailPage() {
               <p className="text-neutral-100 text-base sm:text-lg leading-relaxed">
                 {report.description}
               </p>
+            </div>
+
+            {/* 🩺 PawMedic AI Real-Time Veterinary First-Aid Triage Card */}
+            <div className="space-y-2 pt-2 border-t border-darkBorder">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center space-x-1.5">
+                  <Stethoscope className="w-4 h-4 text-cyan-400" />
+                  <span>PawMedic AI™ Emergency First-Aid Triage</span>
+                </h3>
+                <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded-full flex items-center space-x-1">
+                  <Sparkles className="w-2.5 h-2.5" />
+                  <span>Multimodal Vision</span>
+                </span>
+              </div>
+
+              {pawmedicDiagnosis ? (
+                <PawMedicTriageCard diagnosis={pawmedicDiagnosis} />
+              ) : (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-cyan-950/30 to-blue-950/30 border border-cyan-800/40 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="space-y-1 text-center sm:text-left">
+                    <div className="text-xs font-bold text-white">
+                      Need On-Scene First-Aid Guidance?
+                    </div>
+                    <div className="text-[11px] text-neutral-400">
+                      Run AI multimodal analysis on this dog photo for immediate life-saving steps & safety advice.
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => triggerPawMedicTriage(report)}
+                    disabled={isPawMedicScanning}
+                    className="py-2 px-3.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center space-x-1.5 shrink-0 shadow-lg shadow-cyan-600/20 active:scale-95 disabled:opacity-50"
+                  >
+                    {isPawMedicScanning ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Scanning Vitals...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Stethoscope className="w-3.5 h-3.5" />
+                        <span>Run AI First-Aid Triage</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Reporter Info */}

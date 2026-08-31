@@ -10,6 +10,19 @@ export type ProblemType =
 
 export type ReportStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED";
 
+export type PawMedicSeverity = "CRITICAL" | "MODERATE" | "MINOR" | "HEALTHY_OR_HUNGRY";
+
+export interface PawMedicResult {
+  severity: PawMedicSeverity;
+  conditionTitle: string;
+  confidence: string;
+  summary: string;
+  firstAidSteps: string[];
+  safetyPrecautions: string;
+  equipmentNeeded: string[];
+  suggestedTags: string[];
+}
+
 export interface DogReport {
   id: string;
   reporter_id: string;
@@ -24,6 +37,7 @@ export interface DogReport {
   status: ReportStatus;
   helper_id?: string | null;
   helper_name?: string | null;
+  pawmedic_diagnosis?: PawMedicResult | null;
   created_at: string;
   updated_at: string;
 }

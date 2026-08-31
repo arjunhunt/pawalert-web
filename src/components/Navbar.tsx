@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dog, PlusCircle, MapPin, User, Navigation, Trophy } from "lucide-react";
+import { Dog, PlusCircle, MapPin, User, Navigation, Trophy, Stethoscope } from "lucide-react";
 
 interface NavbarProps {
   userLocation?: { lat: number; lng: number } | null;
@@ -71,6 +71,19 @@ export default function Navbar({
           >
             <PlusCircle className="w-4 h-4" />
             <span>Report Dog</span>
+          </Link>
+
+          {/* PawMedic AI Triage Link */}
+          <Link
+            href="/pawmedic"
+            className={`p-2 rounded-xl border transition-colors ${
+              pathname === "/pawmedic"
+                ? "bg-cyan-950/60 text-cyan-300 border-cyan-500/60"
+                : "bg-neutral-800/40 text-cyan-400 border-darkBorder hover:text-cyan-300 hover:bg-neutral-800"
+            }`}
+            title="PawMedic AI Veterinary Triage"
+          >
+            <Stethoscope className="w-5 h-5 text-cyan-400" />
           </Link>
 
           {/* Leaderboard link */}

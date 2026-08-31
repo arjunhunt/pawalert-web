@@ -11,10 +11,14 @@ import {
   Dog,
   AlertTriangle,
   Compass,
+  Sparkles,
+  Loader2,
+  Stethoscope,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ProblemType, PROBLEM_TYPE_LABELS } from "@/lib/types";
+import PawMedicTriageCard from "@/components/PawMedicTriageCard";
+import { ProblemType, PROBLEM_TYPE_LABELS, PawMedicResult, PawMedicSeverity } from "@/lib/types";
 import { reverseGeocodeDetailed } from "@/lib/geo";
 import { getUserId, getUserName, addMyReportId, syncStatsToCloud } from "@/lib/user";
 import {
@@ -80,12 +84,59 @@ export default function ReportPage() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
+  // PawMedic AI Triage States
+  const [pawmedicDiagnosis, setPawmedicDiagnosis] = useState<PawMedicResult | null>(null);
+  const [isPawMedicScanning, setIsPawMedicScanning] = useState<boolean>(false);
+  const [isPawMedicApplied, setIsPawMedicApplied] = useState<boolean>(false);
+
   // Auto-detect browser GPS and user handle on mount
   useEffect(() => {
     const savedName = localStorage.getItem("pawalert_user_name");
     if (savedName) setReporterName(savedName);
     detectLocation();
   }, []);
+
+  const runPawMedicAI = async (photoData: string) => {
+    if (!photoData) return;
+    setIsPawMedicScanning(true);
+    setIsPawMedicApplied(false);
+    try {
+      const res = await fetch("/api/pawmedic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          photoUrl: photoData.startsWith("data:") ? undefined : photoData,
+          imageBase64: photoData.startsWith("data:") ? photoData : undefined,
+          problemType: selectedCategory,
+          userNotes: description,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        setPawmedicDiagnosis(json.data);
+      }
+    } catch (e) {
+      console.warn("PawMedic background triage failed gracefully:", e);
+    } finally {
+      setIsPawMedicScanning(false);
+    }
+  };
+
+  const handlePhotoUploaded = (url: string) => {
+    setPhotoUrl(url);
+    runPawMedicAI(url);
+  };
+
+  const handleApplyPawMedic = (summaryText: string, sev: PawMedicSeverity) => {
+    setDescription(summaryText);
+    setIsPawMedicApplied(true);
+    if (sev === "CRITICAL" || sev === "MODERATE") {
+      setSelectedCategory("INJURED");
+    } else if (sev === "HEALTHY_OR_HUNGRY") {
+      setSelectedCategory("HUNGRY");
+    }
+  };
 
   const detectLocation = () => {
     if (!navigator.geolocation) return;
@@ -274,12 +325,43 @@ export default function ReportPage() {
               aria-hidden="true"
             />
 
-            {/* Step 1: Photo */}
+            {/* Step 1: Photo & PawMedic AI Scanner */}
             <div className="space-y-3">
-              <label className="block text-sm font-bold text-pawAmber">
-                1. Dog Photo *
-              </label>
-              <PhotoUpload onPhotoReady={setPhotoUrl} currentPhotoUrl={photoUrl} />
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-bold text-pawAmber">
+                  1. Dog Photo *
+                </label>
+                <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded-md flex items-center space-x-1">
+                  <Sparkles className="w-3 h-3 text-cyan-300" />
+                  <span>PawMedic AI Enabled</span>
+                </span>
+              </div>
+
+              <PhotoUpload onPhotoReady={handlePhotoUploaded} currentPhotoUrl={photoUrl} />
+
+              {/* PawMedic Scanning Radar */}
+              {isPawMedicScanning && (
+                <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/40 text-center space-y-2 animate-pulse">
+                  <div className="flex items-center justify-center space-x-2 text-cyan-400 text-xs font-bold">
+                    <Loader2 className="w-4 h-4 animate-spin text-cyan-300" />
+                    <span>PawMedic AI™ Scanning Wound & Vitals...</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400">
+                    Evaluating trauma severity and synthesizing first-aid instructions
+                  </p>
+                </div>
+              )}
+
+              {/* PawMedic Diagnosis Card */}
+              {pawmedicDiagnosis && !isPawMedicScanning && (
+                <div className="pt-2 animate-in fade-in zoom-in-95 duration-200">
+                  <PawMedicTriageCard
+                    diagnosis={pawmedicDiagnosis}
+                    onApplyToReport={handleApplyPawMedic}
+                    isApplied={isPawMedicApplied}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Step 2: Need Category */}
