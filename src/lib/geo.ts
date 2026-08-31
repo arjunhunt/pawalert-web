@@ -120,50 +120,73 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 }
 
 /**
- * Ultra-resilient browser geolocation with high-accuracy GPS -> standard network fallback -> localStorage cache.
+ * Ultra-resilient browser geolocation with high-accuracy GPS -> network triangulation -> IP fallback -> cached coords.
  */
 export async function getResilientGeolocation(): Promise<{ lat: number; lng: number } | null> {
-  if (typeof window === "undefined" || !navigator.geolocation) {
-    return getCachedCoordinates();
-  }
-
-  // Promise helper for getCurrentPosition
-  const tryGetPosition = (options: PositionOptions): Promise<{ lat: number; lng: number }> => {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          cacheCoordinates(coords.lat, coords.lng);
-          resolve(coords);
-        },
-        (err) => reject(err),
-        options
-      );
-    });
-  };
-
-  try {
-    // 1. Try High Accuracy (GPS Satellites) with 6s timeout
-    return await tryGetPosition({
-      enableHighAccuracy: true,
-      timeout: 6000,
-      maximumAge: 15000,
-    });
-  } catch (gpsError) {
-    console.warn("High-accuracy GPS timed out or failed, falling back to standard network geolocation...", gpsError);
-    try {
-      // 2. Fallback to Standard Accuracy (Cellular/Wi-Fi triangulation) with 8s timeout
-      return await tryGetPosition({
-        enableHighAccuracy: false,
-        timeout: 8000,
-        maximumAge: 60000,
+  // 1. Try Browser Hardware GPS & Network Geolocation
+  if (typeof window !== "undefined" && "geolocation" in navigator && navigator.geolocation) {
+    const tryGetPosition = (options: PositionOptions): Promise<{ lat: number; lng: number }> => {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            cacheCoordinates(coords.lat, coords.lng);
+            resolve(coords);
+          },
+          (err) => reject(err),
+          options
+        );
       });
-    } catch (networkError) {
-      console.warn("Standard geolocation failed, falling back to cached coordinates...", networkError);
-      // 3. Fallback to cached coordinates if available
-      return getCachedCoordinates();
+    };
+
+    try {
+      // Step 1: High Accuracy (GPS Satellites) with 5s timeout
+      return await tryGetPosition({
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 10000,
+      });
+    } catch (gpsError) {
+      try {
+        // Step 2: Cellular / Wi-Fi Network Triangulation with 6s timeout
+        return await tryGetPosition({
+          enableHighAccuracy: false,
+          timeout: 6000,
+          maximumAge: 60000,
+        });
+      } catch (networkError) {
+        console.warn("Browser GPS failed or blocked, proceeding to IP geolocation fallback...", networkError);
+      }
     }
   }
+
+  // 2. IP-based Geolocation Fallback (Works reliably across all devices even when GPS is disabled)
+  try {
+    const ipRes = await fetch("https://freeipapi.com/api/json");
+    if (ipRes.ok) {
+      const ipData = await ipRes.json();
+      if (ipData.latitude && ipData.longitude) {
+        const coords = { lat: Number(ipData.latitude), lng: Number(ipData.longitude) };
+        cacheCoordinates(coords.lat, coords.lng);
+        return coords;
+      }
+    }
+  } catch (e1) {
+    try {
+      const ipRes2 = await fetch("https://ipapi.co/json/");
+      if (ipRes2.ok) {
+        const ipData2 = await ipRes2.json();
+        if (ipData2.latitude && ipData2.longitude) {
+          const coords = { lat: Number(ipData2.latitude), lng: Number(ipData2.longitude) };
+          cacheCoordinates(coords.lat, coords.lng);
+          return coords;
+        }
+      }
+    } catch (e2) {}
+  }
+
+  // 3. Fallback to cached coordinates
+  return getCachedCoordinates();
 }
 
 export function cacheCoordinates(lat: number, lng: number): void {
