@@ -20,7 +20,7 @@ import InstallPwaPrompt from "@/components/InstallPwaPrompt";
 import CategoryFilter from "@/components/CategoryFilter";
 import { DogReport, ProblemType, ReportStatus } from "@/lib/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { calculateDistanceMeters } from "@/lib/geo";
+import { calculateDistanceMeters, getResilientGeolocation, getCachedCoordinates } from "@/lib/geo";
 import { sendProximityAlert, getAlertRadiusKm } from "@/lib/notifications";
 
 // Global in-memory SWR cache for 0ms instant page loads
@@ -42,7 +42,7 @@ const MapView = dynamic(() => import("@/components/MapView"), {
 
 export default function Home() {
   const [reports, setReports] = useState<DogReport[]>(() => memoryReportsCache || []);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() => getCachedCoordinates());
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<ProblemType | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<"ACTIVE" | "ALL">("ACTIVE");
@@ -125,24 +125,19 @@ export default function Home() {
     }
   };
 
-  // Detect user GPS location via browser Geolocation API
-  const detectLocation = () => {
-    if (!navigator.geolocation) return;
+  // Detect user GPS location via browser Geolocation API with dual-stage fallback
+  const detectLocation = async () => {
     setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        });
-        setIsLocating(false);
-      },
-      (err) => {
-        console.warn("Geolocation permission denied or error:", err);
-        setIsLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    try {
+      const coords = await getResilientGeolocation();
+      if (coords) {
+        setUserLocation(coords);
+      }
+    } catch (err) {
+      console.warn("Geolocation lock error:", err);
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   // Initial load & Supabase Realtime setup

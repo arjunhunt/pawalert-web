@@ -118,3 +118,108 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
   const detailed = await reverseGeocodeDetailed(lat, lng);
   return detailed.fullAddress;
 }
+
+/**
+ * Ultra-resilient browser geolocation with high-accuracy GPS -> standard network fallback -> localStorage cache.
+ */
+export async function getResilientGeolocation(): Promise<{ lat: number; lng: number } | null> {
+  if (typeof window === "undefined" || !navigator.geolocation) {
+    return getCachedCoordinates();
+  }
+
+  // Promise helper for getCurrentPosition
+  const tryGetPosition = (options: PositionOptions): Promise<{ lat: number; lng: number }> => {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          cacheCoordinates(coords.lat, coords.lng);
+          resolve(coords);
+        },
+        (err) => reject(err),
+        options
+      );
+    });
+  };
+
+  try {
+    // 1. Try High Accuracy (GPS Satellites) with 6s timeout
+    return await tryGetPosition({
+      enableHighAccuracy: true,
+      timeout: 6000,
+      maximumAge: 15000,
+    });
+  } catch (gpsError) {
+    console.warn("High-accuracy GPS timed out or failed, falling back to standard network geolocation...", gpsError);
+    try {
+      // 2. Fallback to Standard Accuracy (Cellular/Wi-Fi triangulation) with 8s timeout
+      return await tryGetPosition({
+        enableHighAccuracy: false,
+        timeout: 8000,
+        maximumAge: 60000,
+      });
+    } catch (networkError) {
+      console.warn("Standard geolocation failed, falling back to cached coordinates...", networkError);
+      // 3. Fallback to cached coordinates if available
+      return getCachedCoordinates();
+    }
+  }
+}
+
+export function cacheCoordinates(lat: number, lng: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("pawalert_user_lat", lat.toString());
+    localStorage.setItem("pawalert_user_lng", lng.toString());
+    localStorage.setItem("pawalert_user_geo_time", Date.now().toString());
+  } catch (e) {
+    // Ignore storage errors
+  }
+}
+
+export function getCachedCoordinates(): { lat: number; lng: number } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const latStr = localStorage.getItem("pawalert_user_lat");
+    const lngStr = localStorage.getItem("pawalert_user_lng");
+    if (latStr && lngStr) {
+      const lat = parseFloat(latStr);
+      const lng = parseFloat(lngStr);
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { lat, lng };
+      }
+    }
+  } catch (e) {
+    // Ignore storage errors
+  }
+  return null;
+}
+
+/**
+ * Resolves a text address or city/area query into latitude & longitude coordinates.
+ */
+export async function forwardGeocode(query: string): Promise<{ lat: number; lng: number } | null> {
+  if (!query || !query.trim()) return null;
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+      {
+        headers: { "Accept-Language": "en" },
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data[0]) {
+      const lat = parseFloat(data[0].lat);
+      const lng = parseFloat(data[0].lon);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+  } catch (e) {
+    console.warn("Forward geocoding error:", e);
+  }
+  return null;
+}
+
+

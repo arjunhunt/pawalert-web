@@ -19,7 +19,7 @@ import Navbar from "@/components/Navbar";
 import PhotoUpload from "@/components/PhotoUpload";
 import PawMedicTriageCard from "@/components/PawMedicTriageCard";
 import { ProblemType, PROBLEM_TYPE_LABELS, PawMedicResult, PawMedicSeverity } from "@/lib/types";
-import { reverseGeocodeDetailed } from "@/lib/geo";
+import { reverseGeocodeDetailed, getResilientGeolocation, getCachedCoordinates, forwardGeocode } from "@/lib/geo";
 import { getUserId, getUserName, addMyReportId, syncStatsToCloud } from "@/lib/user";
 import {
   isSafeImageUrl,
@@ -138,31 +138,27 @@ export default function ReportPage() {
     }
   };
 
-  const detectLocation = () => {
-    if (!navigator.geolocation) return;
+  const detectLocation = async () => {
     setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setLatitude(lat);
-        setLongitude(lng);
-        setIsLocating(false);
+    try {
+      const coords = await getResilientGeolocation();
+      if (coords) {
+        setLatitude(coords.lat);
+        setLongitude(coords.lng);
 
         // Reverse geocode to detailed structured address
-        const details = await reverseGeocodeDetailed(lat, lng);
-        if (details.pincode && !pincode) setPincode(details.pincode);
-        if (details.area && !area) setArea(details.area);
-        if (details.street && !street) setStreet(details.street);
-        if (details.city && !city) setCity(details.city);
-        if (details.state && !state) setState(details.state);
-      },
-      (err) => {
-        console.warn("GPS error:", err);
-        setIsLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+        const details = await reverseGeocodeDetailed(coords.lat, coords.lng);
+        if (details.pincode) setPincode(details.pincode);
+        if (details.area) setArea(details.area);
+        if (details.street) setStreet(details.street);
+        if (details.city) setCity(details.city);
+        if (details.state) setState(details.state);
+      }
+    } catch (err) {
+      console.warn("GPS error:", err);
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const [honeypot, setHoneypot] = useState<string>("");
@@ -200,10 +196,22 @@ export default function ReportPage() {
       return;
     }
 
-    // 4. Coordinates Range & Sanity Validation
-    if (!validateCoordinates(latitude, longitude)) {
-      setErrorMessage("Valid GPS coordinates are required to broadcast the alert.");
-      return;
+    // 4. Coordinates Resolution & Validation (with automated forward-geocoding fallback)
+    let finalLat = latitude;
+    let finalLng = longitude;
+
+    if (!validateCoordinates(finalLat, finalLng)) {
+      const addressQuery = [area, street, city, state].filter(Boolean).join(", ");
+      const geocoded = await forwardGeocode(addressQuery);
+      if (geocoded && validateCoordinates(geocoded.lat, geocoded.lng)) {
+        finalLat = geocoded.lat;
+        finalLng = geocoded.lng;
+        setLatitude(geocoded.lat);
+        setLongitude(geocoded.lng);
+      } else {
+        setErrorMessage("Valid GPS location required. Please tap 'Detect GPS' or specify a known Area/City.");
+        return;
+      }
     }
 
     setIsSubmitting(true);
