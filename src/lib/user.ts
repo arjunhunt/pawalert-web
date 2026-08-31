@@ -65,31 +65,29 @@ export function isMyReport(report: DogReport | null): boolean {
   if (!report) return false;
   if (typeof window === "undefined") return false;
 
-  // If user is super admin, they have master ownership/take-down privileges
+  // 1. Super Admin has master ownership/take-down privileges on all reports
   if (isAdmin()) return true;
 
   const currentUserId = getUserId();
-  const currentUserName = getUserName();
 
-  // 1. Direct ID match
-  if (report.reporter_id && report.reporter_id === currentUserId) return true;
-
-  // 2. Saved created list match
-  try {
-    const list = JSON.parse(localStorage.getItem("pawalert_my_report_ids") || "[]");
-    if (list.includes(report.id)) return true;
-  } catch (e) {
-    // Ignore parse errors
-  }
-
-  // 3. Name match fallback
+  // 2. Direct unique ID match (created by this device/account)
   if (
-    report.reporter_name &&
-    currentUserName &&
-    report.reporter_name.trim().toLowerCase() === currentUserName.trim().toLowerCase() &&
-    report.reporter_name.trim().toLowerCase() !== "anonymous feeder"
+    report.reporter_id &&
+    currentUserId &&
+    currentUserId !== "anonymous" &&
+    report.reporter_id === currentUserId
   ) {
     return true;
+  }
+
+  // 3. Saved created list match on this specific device
+  try {
+    const list = JSON.parse(localStorage.getItem("pawalert_my_report_ids") || "[]");
+    if (Array.isArray(list) && list.includes(report.id)) {
+      return true;
+    }
+  } catch (e) {
+    // Ignore parse errors
   }
 
   return false;
@@ -98,9 +96,27 @@ export function isMyReport(report: DogReport | null): boolean {
 /**
  * Super Admin & Founder Privileges
  */
+export const SUPER_ADMIN_EMAILS = [
+  "wishhhhmaster@gmail.com",
+];
+
+export function isSuperAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  return (
+    SUPER_ADMIN_EMAILS.some((adm) => adm.toLowerCase() === clean) ||
+    clean.includes("wishhhhmaster")
+  );
+}
+
 export function isAdmin(): boolean {
   if (typeof window === "undefined") return false;
-  return localStorage.getItem("pawalert_is_admin") === "true";
+  if (localStorage.getItem("pawalert_is_admin") === "true") return true;
+
+  const authEmail = localStorage.getItem("pawalert_auth_email");
+  if (authEmail && isSuperAdminEmail(authEmail)) return true;
+
+  return false;
 }
 
 export function unlockAdmin(passcode: string): boolean {

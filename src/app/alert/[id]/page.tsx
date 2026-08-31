@@ -595,7 +595,7 @@ export default function AlertDetailPage() {
                 </div>
               )}
 
-              {/* Creator Delete Section */}
+              {/* Creator & Super Admin Delete Section */}
               {isAuthor && (
                 <div className="pt-3 border-t border-darkBorder/60">
                   <button
@@ -604,7 +604,7 @@ export default function AlertDetailPage() {
                     className="w-full py-3 rounded-2xl bg-red-950/30 hover:bg-red-950/60 text-red-400 border border-red-800/40 text-xs font-bold transition-all flex items-center justify-center space-x-2"
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span>Delete This Alert (Author Only)</span>
+                    <span>{isSuperAdmin ? "👑 Master Delete Alert (Super Admin)" : "Delete My Alert (Author Only)"}</span>
                   </button>
                 </div>
               )}
@@ -631,9 +631,13 @@ export default function AlertDetailPage() {
             </div>
 
             <div className="text-center space-y-2">
-              <h3 className="text-xl font-black text-white">Delete this Alert?</h3>
+              <h3 className="text-xl font-black text-white">
+                {isSuperAdmin ? "👑 Master Delete this Alert?" : "Delete your Alert?"}
+              </h3>
               <p className="text-xs sm:text-sm text-neutral-400">
-                Are you sure you want to delete this dog report? It will be permanently removed from the live feed and map for all community volunteers.
+                {isSuperAdmin
+                  ? "As the Super Admin, you are about to permanently delete this report from the database and live map."
+                  : "Are you sure you want to delete this dog report? It will be permanently removed from the live feed and map."}
               </p>
             </div>
 
