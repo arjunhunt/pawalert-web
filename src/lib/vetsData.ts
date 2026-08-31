@@ -191,3 +191,56 @@ export function saveCustomVet(vet: Omit<VetClinic, "id" | "isVerified">): VetCli
 
   return newVet;
 }
+
+/**
+ * Dynamic Global Vet Discovery:
+ * Fetches real veterinary clinics and animal hospitals from OpenStreetMap Overpass API
+ * anywhere on the globe within a 25km radius of the volunteer's current GPS position.
+ */
+export async function fetchGlobalNearbyVets(lat: number, lng: number): Promise<VetClinic[]> {
+  try {
+    const query = `[out:json][timeout:8];(node["amenity"="veterinary"](around:25000,${lat},${lng});node["animal_shelter"="yes"](around:25000,${lat},${lng});way["amenity"="veterinary"](around:25000,${lat},${lng}););out center 15;`;
+    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!data || !data.elements) return [];
+
+    const discovered: VetClinic[] = data.elements
+      .filter((el: any) => el.tags && (el.tags.name || el.tags["name:en"]))
+      .map((el: any, idx: number) => {
+        const tags = el.tags || {};
+        const cLat = el.lat || el.center?.lat || lat;
+        const cLng = el.lon || el.center?.lon || lng;
+        const name = tags.name || tags["name:en"] || "Local Veterinary Clinic";
+        const phone = tags.phone || tags["contact:phone"] || tags["contact:mobile"] || "+91 Emergency Helpline";
+        const is24x7 = tags.opening_hours === "24/7" || tags["emergency"] === "yes";
+        const street = tags["addr:street"] || tags["addr:suburb"] || tags["addr:district"] || "";
+        const city = tags["addr:city"] || tags["addr:town"] || "Local Area";
+
+        return {
+          id: `osm-vet-${el.id || idx}`,
+          name: name,
+          type: is24x7 ? "HOSPITAL_24X7" : (tags.animal_shelter ? "NGO_SHELTER" : "CLINIC"),
+          phone: phone,
+          emergencyPhone: is24x7 ? phone : undefined,
+          is24x7: is24x7,
+          address: street ? `${street}, ${city}` : city,
+          area: street || city,
+          city: city,
+          state: tags["addr:state"] || "",
+          latitude: cLat,
+          longitude: cLng,
+          facilities: is24x7 ? ["24/7 Emergency", "Veterinary Care"] : ["Veterinary OPD", "Animal Care"],
+          isVerified: true,
+          notes: "Live Global Veterinary Network (OSM)",
+        } as VetClinic;
+      });
+
+    return discovered;
+  } catch (e) {
+    console.warn("Global OSM vet lookup failed gracefully:", e);
+    return [];
+  }
+}

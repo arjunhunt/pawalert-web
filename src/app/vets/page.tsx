@@ -21,15 +21,16 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { VetClinic, VetFacilityType, VET_FACILITY_LABELS } from "@/lib/types";
-import { getStoredVets, saveCustomVet } from "@/lib/vetsData";
+import { getStoredVets, saveCustomVet, fetchGlobalNearbyVets } from "@/lib/vetsData";
 import { calculateDistanceMeters, formatDistance, getCachedCoordinates, getDeviceGeolocation } from "@/lib/geo";
 
 export default function VetsDirectoryPage() {
   const [vets, setVets] = useState<VetClinic[]>([]);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() =>
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy?: number } | null>(() =>
     getCachedCoordinates()
   );
   const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [isDiscoveringGlobal, setIsDiscoveringGlobal] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedType, setSelectedType] = useState<VetFacilityType | "ALL">("ALL");
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -48,14 +49,67 @@ export default function VetsDirectoryPage() {
   useEffect(() => {
     setVets(getStoredVets());
     detectGPS();
+
+    // Continuous Live GPS Watcher (Tracks movement dynamically across the globe)
+    let watchId: number | null = null;
+    if (typeof window !== "undefined" && navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const accuracy = pos.coords.accuracy;
+          setUserLocation((prev) => {
+            if (!prev) return { lat, lng, accuracy };
+            const dLat = Math.abs(prev.lat - lat);
+            const dLng = Math.abs(prev.lng - lng);
+            // Only update state if moved > 5 meters to prevent jitter
+            if (dLat > 0.00005 || dLng > 0.00005) {
+              return { lat, lng, accuracy };
+            }
+            return prev;
+          });
+        },
+        (err) => console.warn("Watch position error", err),
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+      );
+    }
+
+    return () => {
+      if (watchId !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
   }, []);
+
+  // Whenever user GPS updates (or moves to a new city/country), discover local clinics
+  useEffect(() => {
+    if (!userLocation || userLocation.lat === 0 || userLocation.lng === 0) return;
+    const loadGlobalVets = async () => {
+      setIsDiscoveringGlobal(true);
+      try {
+        const globalList = await fetchGlobalNearbyVets(userLocation.lat, userLocation.lng);
+        if (globalList.length > 0) {
+          setVets((prev) => {
+            const existingIds = new Set(prev.map((v) => v.id));
+            const unique = globalList.filter((v) => !existingIds.has(v.id));
+            return [...prev, ...unique];
+          });
+        }
+      } catch (e) {
+        console.warn("Global discovery error", e);
+      } finally {
+        setIsDiscoveringGlobal(false);
+      }
+    };
+    loadGlobalVets();
+  }, [userLocation?.lat, userLocation?.lng]);
 
   const detectGPS = async () => {
     setIsLocating(true);
     try {
       const res = await getDeviceGeolocation(false);
       if (res && res.lat !== 0 && res.lng !== 0) {
-        setUserLocation({ lat: res.lat, lng: res.lng });
+        setUserLocation({ lat: res.lat, lng: res.lng, accuracy: res.accuracy });
       }
     } catch (e) {
       console.warn("GPS lookup", e);
@@ -164,8 +218,14 @@ export default function VetsDirectoryPage() {
             disabled={isLocating}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-darkCard border border-darkBorder text-xs text-neutral-300 hover:border-pawAmber transition-colors"
           >
-            <Compass className={`w-3.5 h-3.5 text-pawAmber ${isLocating ? "animate-spin" : ""}`} />
-            <span>{userLocation ? "GPS Active" : "Detect GPS"}</span>
+            <Compass className={`w-3.5 h-3.5 text-pawAmber ${isLocating || isDiscoveringGlobal ? "animate-spin" : ""}`} />
+            <span>
+              {isDiscoveringGlobal
+                ? "Discovering nearby clinics..."
+                : userLocation
+                ? "Live GPS Tracking Active"
+                : "Detect GPS"}
+            </span>
           </button>
         </div>
 
