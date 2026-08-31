@@ -66,6 +66,23 @@ export default function AlertDetailPage() {
     setHelperName(getUserName());
     setIsSuperAdmin(isAdmin());
 
+    const normalize = (raw: any): DogReport => ({
+      id: String(raw?.id || id),
+      reporter_id: raw?.reporter_id || "anonymous",
+      reporter_name: raw?.reporter_name || "Community Feeder",
+      problem_type: raw?.problem_type || "OTHER",
+      description: raw?.description || "No description provided.",
+      photo_url: raw?.photo_url || "",
+      latitude: typeof raw?.latitude === "number" ? raw.latitude : (parseFloat(String(raw?.latitude)) || 19.3824),
+      longitude: typeof raw?.longitude === "number" ? raw.longitude : (parseFloat(String(raw?.longitude)) || 72.8291),
+      address: raw?.address || "Location captured",
+      landmark: raw?.landmark || "",
+      status: raw?.status || "OPEN",
+      helper_name: raw?.helper_name || undefined,
+      created_at: raw?.created_at || new Date().toISOString(),
+      updated_at: raw?.updated_at || undefined,
+    });
+
     const fetchSingleReport = async () => {
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase
@@ -75,16 +92,18 @@ export default function AlertDetailPage() {
           .single();
 
         if (!error && data) {
-          setReport(data as DogReport);
-          setIsAuthor(isMyReport(data as DogReport));
+          const loaded = normalize(data);
+          setReport(loaded);
+          setIsAuthor(isMyReport(loaded));
           return;
         }
       }
 
       // Fallback demo report finder
       const demo = DEMO_REPORTS.find((r) => r.id === id) || DEMO_REPORTS[0];
-      setReport(demo);
-      setIsAuthor(isMyReport(demo));
+      const fallback = normalize(demo);
+      setReport(fallback);
+      setIsAuthor(isMyReport(fallback));
     };
 
     if (id) fetchSingleReport();
@@ -221,7 +240,9 @@ export default function AlertDetailPage() {
     }
   };
 
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${report.latitude},${report.longitude}`;
+  const safeLat = typeof report.latitude === "number" ? report.latitude : (parseFloat(String(report.latitude)) || 19.3824);
+  const safeLng = typeof report.longitude === "number" ? report.longitude : (parseFloat(String(report.longitude)) || 72.8291);
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${safeLat},${safeLng}`;
 
   // Calculate nearest emergency vet or ambulance facility
   const nearestVet = useMemo<{ vet: VetClinic; distance: number } | null>(() => {
@@ -232,8 +253,8 @@ export default function AlertDetailPage() {
 
     for (const vet of allVets) {
       const dist = calculateDistanceMeters(
-        report.latitude,
-        report.longitude,
+        safeLat,
+        safeLng,
         vet.latitude,
         vet.longitude
       );
@@ -247,7 +268,7 @@ export default function AlertDetailPage() {
       return { vet: bestVet, distance: minDistance };
     }
     return null;
-  }, [report]);
+  }, [report, safeLat, safeLng]);
 
   return (
     <div className="min-h-screen flex flex-col bg-darkBg">
@@ -463,7 +484,7 @@ export default function AlertDetailPage() {
                       </div>
                     )}
                     <div className="text-[11px] text-neutral-500 mt-1">
-                      GPS: {report.latitude.toFixed(5)}, {report.longitude.toFixed(5)}
+                      GPS: {Number(safeLat).toFixed(5)}, {Number(safeLng).toFixed(5)}
                     </div>
                   </div>
                 </div>

@@ -114,8 +114,13 @@ export default function MapView({
 
       // Add Dog Report Pins
       reports.forEach((report) => {
-        const catInfo = PROBLEM_TYPE_LABELS[report.problem_type] || PROBLEM_TYPE_LABELS.OTHER;
-        const statusInfo = STATUS_LABELS[report.status] || STATUS_LABELS.OPEN;
+        if (!report) return;
+        const rLat = typeof report.latitude === "number" ? report.latitude : parseFloat(String(report.latitude));
+        const rLng = typeof report.longitude === "number" ? report.longitude : parseFloat(String(report.longitude));
+        if (isNaN(rLat) || isNaN(rLng)) return;
+
+        const catInfo = (report.problem_type && PROBLEM_TYPE_LABELS[report.problem_type]) ? PROBLEM_TYPE_LABELS[report.problem_type] : PROBLEM_TYPE_LABELS.OTHER;
+        const statusInfo = (report.status && STATUS_LABELS[report.status]) ? STATUS_LABELS[report.status] : STATUS_LABELS.OPEN;
 
         const pinColor =
           report.status === "RESOLVED"
@@ -157,7 +162,7 @@ export default function MapView({
               ${catInfo.icon} ${catInfo.label}
             </div>
             <div style="font-size: 12px; color: #444; margin-bottom: 8px;">
-              ${report.address} ${report.landmark ? `<br><small style="color:#d97706">📍 ${report.landmark}</small>` : ""}
+              ${report.address || "Location recorded"} ${report.landmark ? `<br><small style="color:#d97706">📍 ${report.landmark}</small>` : ""}
             </div>
             <a href="/alert/${report.id}" style="
               display: block;
@@ -175,7 +180,7 @@ export default function MapView({
           </div>
         `;
 
-        L.marker([report.latitude, report.longitude], { icon: customPin })
+        L.marker([rLat, rLng], { icon: customPin })
           .addTo(map)
           .bindPopup(popupContent);
       });

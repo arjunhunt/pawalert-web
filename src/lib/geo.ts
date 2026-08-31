@@ -32,8 +32,10 @@ export function formatDistance(meters: number | null | undefined): string {
   return `${(meters / 1000).toFixed(1)} km away`;
 }
 
-export function formatTimeAgo(timestampString: string): string {
+export function formatTimeAgo(timestampString?: string | null): string {
+  if (!timestampString) return "Just now";
   const date = new Date(timestampString);
+  if (isNaN(date.getTime())) return "Recently";
   const now = new Date();
   const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
 

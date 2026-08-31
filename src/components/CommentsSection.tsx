@@ -285,10 +285,10 @@ export default function CommentsSection({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <div className="w-6 h-6 rounded-lg bg-pawAmber/20 flex items-center justify-center text-pawAmber text-[11px] font-bold">
-                      {comment.author_name.charAt(0).toUpperCase()}
+                      {(comment.author_name || "Volunteer").charAt(0).toUpperCase()}
                     </div>
                     <span className="font-bold text-white">
-                      {comment.author_name}
+                      {comment.author_name || "Community Volunteer"}
                     </span>
                     {isAuthorOfReport && (
                       <span className="px-1.5 py-0.5 rounded bg-pawAmber/20 text-pawAmber text-[10px] font-bold">
