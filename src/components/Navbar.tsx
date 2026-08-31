@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dog, PlusCircle, MapPin, User, Navigation, Trophy, HeartPulse } from "lucide-react";
+import { Dog, PlusCircle, MapPin, User, Navigation, Trophy, HeartPulse, Utensils } from "lucide-react";
 
 interface NavbarProps {
   userLocation?: { lat: number; lng: number } | null;
@@ -63,6 +63,20 @@ export default function Navbar({
               </span>
             </button>
           )}
+
+          {/* Daily Stray Dog Feeding Tracker */}
+          <Link
+            href="/feeding"
+            className={`p-2 rounded-xl border transition-colors flex items-center space-x-1.5 ${
+              pathname === "/feeding"
+                ? "bg-amber-950/60 text-amber-300 border-amber-500/60"
+                : "bg-neutral-800/40 text-amber-400 border-darkBorder hover:text-amber-300 hover:bg-neutral-800"
+            }`}
+            title="Daily Feeding Spots & Stray Pack Tracker"
+          >
+            <Utensils className="w-5 h-5 text-pawAmber" />
+            <span className="text-xs font-bold text-pawAmber hidden lg:inline">Feeding</span>
+          </Link>
 
           {/* 24/7 Emergency Vet & Ambulance Directory Link */}
           <Link
