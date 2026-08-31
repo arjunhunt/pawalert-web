@@ -20,7 +20,7 @@ import InstallPwaPrompt from "@/components/InstallPwaPrompt";
 import CategoryFilter from "@/components/CategoryFilter";
 import { DogReport, ProblemType, ReportStatus } from "@/lib/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { calculateDistanceMeters, getResilientGeolocation, getCachedCoordinates } from "@/lib/geo";
+import { calculateDistanceMeters, getDeviceGeolocation, getCachedCoordinates } from "@/lib/geo";
 import { sendProximityAlert, getAlertRadiusKm } from "@/lib/notifications";
 
 // Global in-memory SWR cache for 0ms instant page loads
@@ -125,13 +125,18 @@ export default function Home() {
     }
   };
 
-  // Detect user GPS location via browser Geolocation API with dual-stage fallback
-  const detectLocation = async () => {
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  // Detect user GPS location via real device hardware GPS
+  const detectLocation = async (isManual: boolean = false) => {
     setIsLocating(true);
+    setLocationError(null);
     try {
-      const coords = await getResilientGeolocation();
-      if (coords) {
-        setUserLocation(coords);
+      const res = await getDeviceGeolocation(isManual);
+      if (res && res.lat !== 0 && res.lng !== 0) {
+        setUserLocation({ lat: res.lat, lng: res.lng });
+      } else if (res?.error && isManual) {
+        setLocationError(res.error);
       }
     } catch (err) {
       console.warn("Geolocation lock error:", err);
@@ -256,6 +261,22 @@ export default function Home() {
           onDismissAlert={() => setIncomingAlert(null)}
         />
 
+        {/* Location Permission / Diagnostic Banner */}
+        {locationError && (
+          <div className="bg-amber-950/60 border border-amber-500/40 rounded-2xl p-3.5 flex items-center justify-between text-xs text-amber-200">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>{locationError}</span>
+            </div>
+            <button
+              onClick={() => setLocationError(null)}
+              className="ml-2 text-amber-400 hover:text-white font-bold text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Top Control Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-darkCard/80 backdrop-blur-md p-4 rounded-3xl border border-darkBorder">
           {/* Status Tabs & Report Dog Button */}
@@ -296,7 +317,7 @@ export default function Home() {
           {/* Location & View Controls */}
           <div className="flex items-center space-x-2 w-full sm:w-auto justify-between sm:justify-end">
             <button
-              onClick={detectLocation}
+              onClick={() => detectLocation(true)}
               disabled={isLocating}
               className="flex items-center space-x-1.5 px-3 py-2 rounded-2xl bg-darkBg hover:bg-neutral-800 border border-darkBorder text-xs text-neutral-300 transition-colors"
               title="Update your GPS location"

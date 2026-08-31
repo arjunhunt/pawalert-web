@@ -120,64 +120,71 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 }
 
 /**
- * Ultra-resilient browser geolocation with high-accuracy GPS -> network triangulation -> IP fallback -> cached coords.
+ * Real device hardware GPS (Sub-meter accuracy on mobile phones).
+ * Never uses inaccurate IP address fallback.
  */
-export async function getResilientGeolocation(forceRefresh: boolean = false): Promise<{ lat: number; lng: number } | null> {
-  // 1. Prioritize Real Hardware GPS (Sub-meter accuracy on mobile phones)
-  if (typeof window !== "undefined" && "geolocation" in navigator && navigator.geolocation) {
-    const tryGetPosition = (options: PositionOptions): Promise<{ lat: number; lng: number }> => {
-      return new Promise((resolve, reject) => {
+export async function getDeviceGeolocation(forceRefresh: boolean = false): Promise<{ lat: number; lng: number; error?: string } | null> {
+  if (typeof window === "undefined" || !navigator.geolocation) {
+    return { lat: 0, lng: 0, error: "Geolocation is not supported on this browser." };
+  }
+
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        };
+        cacheCoordinates(coords.lat, coords.lng);
+        resolve(coords);
+      },
+      (err) => {
+        console.warn("Hardware GPS error:", err.code, err.message);
+        let errMsg = "Could not detect GPS location.";
+        if (err.code === 1) {
+          errMsg = "Location permission is denied. Tap the 🔒 icon in Chrome address bar -> Site settings -> Allow Location.";
+        } else if (err.code === 2) {
+          errMsg = "GPS position unavailable. Please check if Location is turned ON in your phone settings.";
+        } else if (err.code === 3) {
+          errMsg = "GPS satellite request timed out. Please tap Detect GPS again.";
+        }
+
+        // Retry with lower accuracy / network tower fix
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            const coords = {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            };
             cacheCoordinates(coords.lat, coords.lng);
             resolve(coords);
           },
-          (err) => reject(err),
-          options
+          () => {
+            resolve({ lat: 0, lng: 0, error: errMsg });
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: forceRefresh ? 0 : 30000 }
         );
-      });
-    };
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: forceRefresh ? 0 : 10000 }
+    );
+  });
+}
 
-    try {
-      // Step 1: True Hardware GPS Satellites (12s timeout for accurate fix)
-      return await tryGetPosition({
-        enableHighAccuracy: true,
-        timeout: 12000,
-        maximumAge: forceRefresh ? 0 : 10000,
-      });
-    } catch (gpsError) {
-      console.warn("High-accuracy GPS timed out or weak, trying fast mobile network triangulation...", gpsError);
-      try {
-        // Step 2: Cellular / Wi-Fi Network Triangulation (8s timeout)
-        return await tryGetPosition({
-          enableHighAccuracy: false,
-          timeout: 8000,
-          maximumAge: forceRefresh ? 0 : 30000,
-        });
-      } catch (networkError) {
-        console.warn("Browser GPS failed or blocked, trying IP geolocation fallback...", networkError);
-      }
-    }
+export async function getResilientGeolocation(forceRefresh: boolean = false): Promise<{ lat: number; lng: number } | null> {
+  const res = await getDeviceGeolocation(forceRefresh);
+  if (res && res.lat !== 0 && res.lng !== 0) {
+    return { lat: res.lat, lng: res.lng };
   }
-
-  // 2. Only use IP-based Geolocation as an emergency last-resort if hardware GPS is unavailable or blocked
-  if (!forceRefresh) {
-    try {
-      const ipRes = await fetch("https://freeipapi.com/api/json");
-      if (ipRes.ok) {
-        const ipData = await ipRes.json();
-        if (ipData.latitude && ipData.longitude) {
-          const coords = { lat: Number(ipData.latitude), lng: Number(ipData.longitude) };
-          cacheCoordinates(coords.lat, coords.lng);
-          return coords;
-        }
-      }
-    } catch (e1) {}
-  }
-
-  // 3. Fallback to cached coordinates
   return getCachedCoordinates();
+}
+
+export function clearCachedCoordinates(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem("pawalert_user_lat");
+    localStorage.removeItem("pawalert_user_lng");
+    localStorage.removeItem("pawalert_user_geo_time");
+  } catch (e) {}
 }
 
 export function cacheCoordinates(lat: number, lng: number): void {
