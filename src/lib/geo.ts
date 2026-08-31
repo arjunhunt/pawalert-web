@@ -122,8 +122,8 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 /**
  * Ultra-resilient browser geolocation with high-accuracy GPS -> network triangulation -> IP fallback -> cached coords.
  */
-export async function getResilientGeolocation(): Promise<{ lat: number; lng: number } | null> {
-  // 1. Try Browser Hardware GPS & Network Geolocation
+export async function getResilientGeolocation(forceRefresh: boolean = false): Promise<{ lat: number; lng: number } | null> {
+  // 1. Prioritize Real Hardware GPS (Sub-meter accuracy on mobile phones)
   if (typeof window !== "undefined" && "geolocation" in navigator && navigator.geolocation) {
     const tryGetPosition = (options: PositionOptions): Promise<{ lat: number; lng: number }> => {
       return new Promise((resolve, reject) => {
@@ -140,49 +140,40 @@ export async function getResilientGeolocation(): Promise<{ lat: number; lng: num
     };
 
     try {
-      // Step 1: High Accuracy (GPS Satellites) with 5s timeout
+      // Step 1: True Hardware GPS Satellites (12s timeout for accurate fix)
       return await tryGetPosition({
         enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 10000,
+        timeout: 12000,
+        maximumAge: forceRefresh ? 0 : 10000,
       });
     } catch (gpsError) {
+      console.warn("High-accuracy GPS timed out or weak, trying fast mobile network triangulation...", gpsError);
       try {
-        // Step 2: Cellular / Wi-Fi Network Triangulation with 6s timeout
+        // Step 2: Cellular / Wi-Fi Network Triangulation (8s timeout)
         return await tryGetPosition({
           enableHighAccuracy: false,
-          timeout: 6000,
-          maximumAge: 60000,
+          timeout: 8000,
+          maximumAge: forceRefresh ? 0 : 30000,
         });
       } catch (networkError) {
-        console.warn("Browser GPS failed or blocked, proceeding to IP geolocation fallback...", networkError);
+        console.warn("Browser GPS failed or blocked, trying IP geolocation fallback...", networkError);
       }
     }
   }
 
-  // 2. IP-based Geolocation Fallback (Works reliably across all devices even when GPS is disabled)
-  try {
-    const ipRes = await fetch("https://freeipapi.com/api/json");
-    if (ipRes.ok) {
-      const ipData = await ipRes.json();
-      if (ipData.latitude && ipData.longitude) {
-        const coords = { lat: Number(ipData.latitude), lng: Number(ipData.longitude) };
-        cacheCoordinates(coords.lat, coords.lng);
-        return coords;
-      }
-    }
-  } catch (e1) {
+  // 2. Only use IP-based Geolocation as an emergency last-resort if hardware GPS is unavailable or blocked
+  if (!forceRefresh) {
     try {
-      const ipRes2 = await fetch("https://ipapi.co/json/");
-      if (ipRes2.ok) {
-        const ipData2 = await ipRes2.json();
-        if (ipData2.latitude && ipData2.longitude) {
-          const coords = { lat: Number(ipData2.latitude), lng: Number(ipData2.longitude) };
+      const ipRes = await fetch("https://freeipapi.com/api/json");
+      if (ipRes.ok) {
+        const ipData = await ipRes.json();
+        if (ipData.latitude && ipData.longitude) {
+          const coords = { lat: Number(ipData.latitude), lng: Number(ipData.longitude) };
           cacheCoordinates(coords.lat, coords.lng);
           return coords;
         }
       }
-    } catch (e2) {}
+    } catch (e1) {}
   }
 
   // 3. Fallback to cached coordinates

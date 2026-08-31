@@ -65,17 +65,22 @@ export default function MapView({
         }
       });
 
-      // User Location Marker
+      // User Location Marker & Auto-Centering
       if (userLocation) {
         const userIcon = L.divIcon({
           className: "user-loc-pin",
-          html: `<div style="background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);"></div>`,
-          iconSize: [16, 16],
-          iconAnchor: [8, 8],
+          html: `<div style="background-color: #3b82f6; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 14px rgba(59, 130, 246, 0.9);"></div>`,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
         });
         L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
           .addTo(map)
           .bindPopup("<b>📍 Your Current Location</b>");
+
+        // Pan map into user's exact neighborhood / colony
+        if (!interactiveSelect) {
+          map.setView([userLocation.lat, userLocation.lng], 15);
+        }
       }
 
       // Add Dog Report Pins
