@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   ArrowLeft,
   Send,
@@ -13,12 +14,13 @@ import {
   Compass,
   Sparkles,
   Loader2,
-  Stethoscope,
+  CheckCircle2,
+  Crosshair,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ProblemType, PROBLEM_TYPE_LABELS } from "@/lib/types";
-import { reverseGeocodeDetailed, getResilientGeolocation, getCachedCoordinates, forwardGeocode } from "@/lib/geo";
+import { ProblemType, PROBLEM_TYPE_LABELS, DogReport } from "@/lib/types";
+import { reverseGeocodeDetailed, getAccurateGPSPosition, getCachedCoordinates, forwardGeocode } from "@/lib/geo";
 import { getUserId, getUserName, addMyReportId, syncStatsToCloud } from "@/lib/user";
 import {
   isSafeImageUrl,
@@ -61,6 +63,16 @@ const INDIAN_STATES = [
   "Other / Union Territory",
 ];
 
+const MapView = dynamic(() => import("@/components/MapView"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-44 rounded-2xl bg-neutral-900 flex items-center justify-center text-neutral-400 text-xs">
+      <Compass className="w-5 h-5 animate-spin text-pawAmber mr-2" />
+      <span>Loading Pinpoint Satellite Map...</span>
+    </div>
+  ),
+});
+
 export default function ReportPage() {
   const router = useRouter();
 
@@ -72,6 +84,8 @@ export default function ReportPage() {
   // Granular Location States
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [isAdjustingPin, setIsAdjustingPin] = useState<boolean>(false);
   const [pincode, setPincode] = useState<string>("");
   const [area, setArea] = useState<string>("");
   const [street, setStreet] = useState<string>("");
@@ -96,25 +110,45 @@ export default function ReportPage() {
 
   const detectLocation = async () => {
     setIsLocating(true);
+    setErrorMessage("");
     try {
-      const coords = await getResilientGeolocation();
-      if (coords) {
-        setLatitude(coords.lat);
-        setLongitude(coords.lng);
+      const res = await getAccurateGPSPosition(true, 6000);
+      if (res && res.lat !== 0 && res.lng !== 0) {
+        setLatitude(res.lat);
+        setLongitude(res.lng);
+        setGpsAccuracy(Math.round(res.accuracy));
 
         // Reverse geocode to detailed structured address
-        const details = await reverseGeocodeDetailed(coords.lat, coords.lng);
+        const details = await reverseGeocodeDetailed(res.lat, res.lng);
         if (details.pincode) setPincode(details.pincode);
         if (details.area) setArea(details.area);
         if (details.street) setStreet(details.street);
         if (details.city) setCity(details.city);
         if (details.state) setState(details.state);
+      } else if (res?.error) {
+        setErrorMessage(res.error);
       }
     } catch (err) {
       console.warn("GPS error:", err);
     } finally {
       setIsLocating(false);
     }
+  };
+
+  const handleMapCoordinatePicked = async (lat: number, lng: number) => {
+    setLatitude(lat);
+    setLongitude(lng);
+    setGpsAccuracy(1); // Manually verified exact pinpoint!
+    setIsAdjustingPin(true);
+    try {
+      const details = await reverseGeocodeDetailed(lat, lng);
+      if (details.pincode) setPincode(details.pincode);
+      if (details.area) setArea(details.area);
+      if (details.street) setStreet(details.street);
+      if (details.city) setCity(details.city);
+      if (details.state) setState(details.state);
+    } catch (e) {}
+    setTimeout(() => setIsAdjustingPin(false), 800);
   };
 
   const [honeypot, setHoneypot] = useState<string>("");
@@ -357,17 +391,37 @@ export default function ReportPage() {
               </div>
 
               <div className="bg-darkBg border border-darkBorder rounded-2xl p-5 space-y-4">
-                {/* GPS Auto-Detect Bar */}
-                <div className="flex items-center justify-between pb-3 border-b border-darkBorder">
+                {/* GPS Auto-Detect Bar & High-Precision Meter */}
+                <div className="flex items-center justify-between pb-3 border-b border-darkBorder flex-wrap gap-2">
                   <div className="flex items-center space-x-2">
-                    <MapPin className={`w-5 h-5 ${latitude ? "text-green-400" : "text-neutral-500"}`} />
+                    <MapPin className={`w-5 h-5 ${latitude ? "text-emerald-400" : "text-neutral-500"}`} />
                     <div>
-                      <div className="text-xs font-bold text-white">
-                        {latitude ? "GPS Coordinates Locked" : "GPS Required"}
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-bold text-white">
+                          {latitude ? "GPS Coordinates Locked" : "GPS Required"}
+                        </span>
+                        {gpsAccuracy !== null && (
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center space-x-1 ${
+                              gpsAccuracy <= 10
+                                ? "bg-emerald-950/60 text-emerald-300 border-emerald-800/60"
+                                : gpsAccuracy <= 25
+                                ? "bg-amber-950/60 text-amber-300 border-amber-800/60"
+                                : "bg-neutral-800 text-neutral-300 border-neutral-700"
+                            }`}
+                          >
+                            <Crosshair className="w-3 h-3" />
+                            <span>
+                              {gpsAccuracy <= 1
+                                ? "🎯 Exact Pinpoint Verified"
+                                : `±${gpsAccuracy}m Accuracy`}
+                            </span>
+                          </span>
+                        )}
                       </div>
                       {latitude && longitude && (
                         <div className="text-[11px] text-neutral-400">
-                          {latitude.toFixed(5)}, {longitude.toFixed(5)}
+                          {latitude.toFixed(6)}, {longitude.toFixed(6)}
                         </div>
                       )}
                     </div>
@@ -377,11 +431,93 @@ export default function ReportPage() {
                     type="button"
                     onClick={detectLocation}
                     disabled={isLocating}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-pawAmber/15 text-pawAmber text-xs font-bold border border-pawAmber/30 hover:bg-pawAmber/25 transition-all"
+                    className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-pawAmber/15 text-pawAmber text-xs font-bold border border-pawAmber/30 hover:bg-pawAmber/25 transition-all shadow-sm active:scale-95"
                   >
                     <Navigation className={`w-3.5 h-3.5 ${isLocating ? "animate-spin" : ""}`} />
-                    <span>{latitude ? "Refresh GPS" : "Detect GPS"}</span>
+                    <span>{isLocating ? "Locking GPS..." : latitude ? "Re-lock GPS" : "Detect GPS"}</span>
                   </button>
+                </div>
+
+                {/* 📍 Interactive Draggable Pinpoint Map */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-neutral-200 flex items-center space-x-1">
+                      <span>📍</span>
+                      <span>Pinpoint Exact Dog Spot</span>
+                    </span>
+                    <span className="text-[11px] text-pawAmber font-semibold">
+                      Tap map or drag pin to adjust
+                    </span>
+                  </div>
+
+                  <div className="h-52 w-full rounded-2xl overflow-hidden border border-darkBorder relative shadow-inner">
+                    <MapView
+                      reports={
+                        latitude && longitude
+                          ? [
+                              {
+                                id: "report-preview-pin",
+                                reporter_id: "me",
+                                reporter_name: reporterName,
+                                problem_type: selectedCategory,
+                                description: description || "Target Dog Spot",
+                                photo_url: photoUrl,
+                                latitude: latitude,
+                                longitude: longitude,
+                                address: area || "Exact Dog Location",
+                                landmark: landmark,
+                                status: "OPEN",
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString(),
+                              },
+                            ]
+                          : []
+                      }
+                      userLocation={
+                        latitude && longitude
+                          ? { lat: latitude, lng: longitude, accuracy: gpsAccuracy || 10 }
+                          : null
+                      }
+                      interactiveSelect={true}
+                      onSelectCoordinate={handleMapCoordinatePicked}
+                    />
+
+                    {isAdjustingPin && (
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md px-3 py-1 rounded-full text-emerald-400 text-[11px] font-bold border border-emerald-800/60 shadow-lg flex items-center space-x-1.5 z-[1000]">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Exact Spot Pinpoint Updated!</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick Spot Clue Chips */}
+                <div className="space-y-1.5 pt-1">
+                  <label className="block text-[11px] font-bold text-neutral-400">
+                    ⚡ Quick Visual Clues (helps volunteer spot dog in 5 seconds):
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      "🌳 Under Tree",
+                      "🏪 Near Shop / Chai Stall",
+                      "🚗 Near Parked Car/Auto",
+                      "🏢 Society / Building Gate",
+                      "🛣️ Footpath / Divider",
+                      "🐾 Colony Alley / Corner",
+                    ].map((clue) => (
+                      <button
+                        key={clue}
+                        type="button"
+                        onClick={() => {
+                          if (!landmark) setLandmark(clue);
+                          else if (!landmark.includes(clue)) setLandmark(`${landmark}, ${clue}`);
+                        }}
+                        className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-neutral-800/90 hover:bg-neutral-700 border border-darkBorder text-neutral-300 transition-all active:scale-95"
+                      >
+                        + {clue}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Pincode */}
@@ -432,16 +568,16 @@ export default function ReportPage() {
                 {/* Additional details / Landmark */}
                 <div>
                   <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                    Additional details / Landmark (Optional)
+                    Spot Landmark / Visual Recognition Clue
                   </label>
                   <input
                     type="text"
                     value={landmark}
                     onChange={(e) => setLandmark(e.target.value)}
-                    placeholder="e.g. Opposite State Bank, behind bus stand, 2nd lane, under banyan tree"
+                    placeholder="e.g. Opposite State Bank, behind bus stand, under banyan tree"
                     className="w-full bg-darkCard border border-darkBorder rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-pawAmber"
                   />
-                  <p className="text-[11px] text-neutral-500 mt-1">Any extra info to help locate the exact spot quickly</p>
+                  <p className="text-[11px] text-neutral-500 mt-1">Exact visual clues so responders can spot the dog without wandering</p>
                 </div>
 
                 {/* City & State Row */}

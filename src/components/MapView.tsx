@@ -151,23 +151,24 @@ export default function MapView({
           html: `
             <div style="
               background-color: ${pinColor};
-              width: 34px;
-              height: 34px;
+              width: 38px;
+              height: 38px;
               border-radius: 50% 50% 50% 0;
               transform: rotate(-45deg);
               display: flex;
               align-items: center;
               justify-content: center;
-              border: 2px solid white;
-              box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-              cursor: pointer;
+              border: 3px solid white;
+              box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+              cursor: ${interactiveSelect ? "grab" : "pointer"};
+              ${interactiveSelect ? "animation: pulse 1.8s infinite;" : ""}
             ">
-              <span style="transform: rotate(45deg); font-size: 16px;">${catInfo.icon}</span>
+              <span style="transform: rotate(45deg); font-size: 18px;">${catInfo.icon}</span>
             </div>
           `,
-          iconSize: [34, 34],
-          iconAnchor: [17, 34],
-          popupAnchor: [0, -30],
+          iconSize: [38, 38],
+          iconAnchor: [19, 38],
+          popupAnchor: [0, -34],
         });
 
         const popupContent = `
@@ -181,25 +182,39 @@ export default function MapView({
             <div style="font-size: 12px; color: #444; margin-bottom: 8px;">
               ${report.address || "Location recorded"} ${report.landmark ? `<br><small style="color:#d97706">📍 ${report.landmark}</small>` : ""}
             </div>
-            <a href="/alert/${report.id}" style="
-              display: block;
-              text-align: center;
-              background-color: #EF6C00;
-              color: white;
-              text-decoration: none;
-              padding: 6px 12px;
-              border-radius: 8px;
-              font-size: 12px;
-              font-weight: 700;
-            ">
-              View Alert & Help 🐾
-            </a>
+            ${
+              interactiveSelect
+                ? `<div style="font-size: 11px; color: #EF6C00; font-weight: bold;">📍 Drag pin or tap map to adjust spot</div>`
+                : `<a href="/alert/${report.id}" style="
+                    display: block;
+                    text-align: center;
+                    background-color: #EF6C00;
+                    color: white;
+                    text-decoration: none;
+                    padding: 6px 12px;
+                    border-radius: 8px;
+                    font-size: 12px;
+                    font-weight: 700;
+                  ">
+                    View Alert & Help 🐾
+                  </a>`
+            }
           </div>
         `;
 
-        L.marker([rLat, rLng], { icon: customPin })
-          .addTo(map)
-          .bindPopup(popupContent);
+        const marker = L.marker([rLat, rLng], {
+          icon: customPin,
+          draggable: interactiveSelect,
+        }).addTo(map);
+
+        if (interactiveSelect && onSelectCoordinate) {
+          marker.on("dragend", (e: any) => {
+            const pos = e.target.getLatLng();
+            onSelectCoordinate(pos.lat, pos.lng);
+          });
+        }
+
+        marker.bindPopup(popupContent);
       });
     });
 
