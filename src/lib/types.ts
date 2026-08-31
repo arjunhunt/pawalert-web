@@ -106,21 +106,3 @@ export const VET_FACILITY_LABELS: Record<VetFacilityType, { label: string; icon:
   NGO_SHELTER: { label: "NGO / Free Stray Care", icon: "🐾", bg: "bg-emerald-950/40 text-emerald-400 border-emerald-800/40" },
 };
 
-export interface FeedingSpot {
-  id: string;
-  name: string;
-  dog_count: number;
-  puppy_count?: number;
-  area: string;
-  city: string;
-  address: string;
-  landmark: string;
-  latitude: number;
-  longitude: number;
-  dietary_notes?: string;
-  last_fed_at?: string | null;
-  last_fed_by?: string | null;
-  created_by?: string;
-  created_at: string;
-}
-
