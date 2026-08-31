@@ -66,7 +66,7 @@ export default function PawMedicPage() {
     }
   };
 
-  // Preset sample test cases for rapid hackathon judge demonstrations
+  // Preset sample diagnostic test cases
   const loadSampleCase = async (sampleType: "FRACTURE" | "MANGE" | "HUNGRY") => {
     setIsScanning(true);
     setErrorMsg(null);
@@ -134,11 +134,11 @@ export default function PawMedicPage() {
           </p>
         </div>
 
-        {/* Rapid Hackathon Demo Presets */}
+        {/* Sample Clinical Cases */}
         <div className="p-3.5 rounded-2xl bg-neutral-900/80 border border-darkBorder space-y-2">
           <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider flex items-center space-x-1">
             <Sparkles className="w-3 h-3 text-pawAmber" />
-            <span>1-Click Hackathon Demo Cases:</span>
+            <span>Sample Clinical Cases:</span>
           </div>
           <div className="grid grid-cols-3 gap-2">
             <button
