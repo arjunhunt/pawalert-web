@@ -120,54 +120,95 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 }
 
 /**
- * Real device hardware GPS (Sub-meter accuracy on mobile phones).
- * Never uses inaccurate IP address fallback.
+ * High-Precision GPS Lock with Progressive Satellite Convergence & Anti-Jitter Filter.
+ * Samples continuous GPS fixes for up to 6 seconds to lock onto the highest-precision satellite reading (<20m accuracy).
  */
-export async function getDeviceGeolocation(forceRefresh: boolean = false): Promise<{ lat: number; lng: number; error?: string } | null> {
+export function getAccurateGPSPosition(
+  forceRefresh: boolean = false,
+  maxWaitMs: number = 6000
+): Promise<{ lat: number; lng: number; accuracy: number; error?: string } | null> {
   if (typeof window === "undefined" || !navigator.geolocation) {
-    return { lat: 0, lng: 0, error: "Geolocation is not supported on this browser." };
+    return Promise.resolve({ lat: 0, lng: 0, accuracy: 9999, error: "Geolocation is not supported on this browser." });
   }
 
   return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        };
-        cacheCoordinates(coords.lat, coords.lng);
-        resolve(coords);
-      },
-      (err) => {
-        console.warn("Hardware GPS error:", err.code, err.message);
-        let errMsg = "Could not detect GPS location.";
-        if (err.code === 1) {
-          errMsg = "Location permission is denied. Tap the 🔒 icon in Chrome address bar -> Site settings -> Allow Location.";
-        } else if (err.code === 2) {
-          errMsg = "GPS position unavailable. Please check if Location is turned ON in your phone settings.";
-        } else if (err.code === 3) {
-          errMsg = "GPS satellite request timed out. Please tap Detect GPS again.";
-        }
+    let bestFix: { lat: number; lng: number; accuracy: number } | null = null;
+    let watchId: number | null = null;
+    let hasResolved = false;
 
-        // Retry with lower accuracy / network tower fix
+    const finish = (result: { lat: number; lng: number; accuracy: number; error?: string } | null) => {
+      if (hasResolved) return;
+      hasResolved = true;
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      if (result && result.lat !== 0 && result.lng !== 0) {
+        cacheCoordinates(result.lat, result.lng, result.accuracy);
+      }
+      resolve(result);
+    };
+
+    // Safety timeout: take the best fix collected so far
+    const timer = setTimeout(() => {
+      if (bestFix && bestFix.accuracy < 250) {
+        finish(bestFix);
+      } else {
+        // Fallback to one-shot getCurrentPosition with network
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            const coords = {
+            const fix = {
               lat: pos.coords.latitude,
               lng: pos.coords.longitude,
+              accuracy: pos.coords.accuracy || 50,
             };
-            cacheCoordinates(coords.lat, coords.lng);
-            resolve(coords);
+            finish(fix);
           },
-          () => {
-            resolve({ lat: 0, lng: 0, error: errMsg });
+          (err) => {
+            let errMsg = "Could not detect accurate GPS location.";
+            if (err.code === 1) errMsg = "Location permission is denied. Please allow location in browser settings.";
+            else if (err.code === 2) errMsg = "GPS signal unavailable. Please enable Location in phone settings.";
+            else if (err.code === 3) errMsg = "GPS satellite lock timed out. Please tap Detect GPS again.";
+            finish({ lat: 0, lng: 0, accuracy: 9999, error: errMsg });
           },
-          { enableHighAccuracy: false, timeout: 10000, maximumAge: forceRefresh ? 0 : 30000 }
+          { enableHighAccuracy: false, timeout: 5000, maximumAge: forceRefresh ? 0 : 30000 }
         );
+      }
+    }, maxWaitMs);
+
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const currentAccuracy = pos.coords.accuracy;
+        const currentFix = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: currentAccuracy,
+        };
+
+        // Anti-jitter: update bestFix if this fix has higher precision
+        if (!bestFix || currentAccuracy < bestFix.accuracy) {
+          bestFix = currentFix;
+        }
+
+        // If satellite lock reaches sub-20m accuracy (high precision), resolve immediately!
+        if (currentAccuracy <= 20) {
+          clearTimeout(timer);
+          finish(bestFix);
+        }
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: forceRefresh ? 0 : 10000 }
+      (err) => {
+        console.warn("GPS watch warning:", err.code, err.message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: forceRefresh ? 0 : 5000,
+      }
     );
   });
+}
+
+export async function getDeviceGeolocation(forceRefresh: boolean = false): Promise<{ lat: number; lng: number; accuracy?: number; error?: string } | null> {
+  return getAccurateGPSPosition(forceRefresh, 6000);
 }
 
 export async function getResilientGeolocation(forceRefresh: boolean = false): Promise<{ lat: number; lng: number } | null> {
@@ -183,31 +224,37 @@ export function clearCachedCoordinates(): void {
   try {
     localStorage.removeItem("pawalert_user_lat");
     localStorage.removeItem("pawalert_user_lng");
+    localStorage.removeItem("pawalert_user_accuracy");
     localStorage.removeItem("pawalert_user_geo_time");
   } catch (e) {}
 }
 
-export function cacheCoordinates(lat: number, lng: number): void {
+export function cacheCoordinates(lat: number, lng: number, accuracy?: number): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem("pawalert_user_lat", lat.toString());
     localStorage.setItem("pawalert_user_lng", lng.toString());
+    if (accuracy) {
+      localStorage.setItem("pawalert_user_accuracy", accuracy.toString());
+    }
     localStorage.setItem("pawalert_user_geo_time", Date.now().toString());
   } catch (e) {
     // Ignore storage errors
   }
 }
 
-export function getCachedCoordinates(): { lat: number; lng: number } | null {
+export function getCachedCoordinates(): { lat: number; lng: number; accuracy?: number } | null {
   if (typeof window === "undefined") return null;
   try {
     const latStr = localStorage.getItem("pawalert_user_lat");
     const lngStr = localStorage.getItem("pawalert_user_lng");
+    const accStr = localStorage.getItem("pawalert_user_accuracy");
     if (latStr && lngStr) {
       const lat = parseFloat(latStr);
       const lng = parseFloat(lngStr);
+      const accuracy = accStr ? parseFloat(accStr) : undefined;
       if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-        return { lat, lng };
+        return { lat, lng, accuracy };
       }
     }
   } catch (e) {

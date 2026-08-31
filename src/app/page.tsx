@@ -42,7 +42,7 @@ const MapView = dynamic(() => import("@/components/MapView"), {
 
 export default function Home() {
   const [reports, setReports] = useState<DogReport[]>(() => memoryReportsCache || []);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() => getCachedCoordinates());
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy?: number } | null>(() => getCachedCoordinates());
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<ProblemType | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<"ACTIVE" | "ALL">("ACTIVE");
@@ -134,7 +134,7 @@ export default function Home() {
     try {
       const res = await getDeviceGeolocation(isManual);
       if (res && res.lat !== 0 && res.lng !== 0) {
-        setUserLocation({ lat: res.lat, lng: res.lng });
+        setUserLocation({ lat: res.lat, lng: res.lng, accuracy: res.accuracy });
       } else if (res?.error && isManual) {
         setLocationError(res.error);
       }

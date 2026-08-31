@@ -6,7 +6,7 @@ import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
 
 interface MapViewProps {
   reports: DogReport[];
-  userLocation?: { lat: number; lng: number } | null;
+  userLocation?: { lat: number; lng: number; accuracy?: number } | null;
   onSelectCoordinate?: (lat: number, lng: number) => void;
   interactiveSelect?: boolean;
 }
@@ -19,6 +19,7 @@ export default function MapView({
 }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
+  const lastCenteredLocationRef = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -35,7 +36,7 @@ export default function MapView({
       const centerLng = userLocation?.lng || reports[0]?.longitude || 72.7549;
 
       if (!mapInstanceRef.current) {
-        const map = L.map(mapContainerRef.current).setView([centerLat, centerLng], 14);
+        const map = L.map(mapContainerRef.current).setView([centerLat, centerLng], 15);
         mapInstanceRef.current = map;
 
         // OpenStreetMap Tile Layer (100% Free, High Precision, No Watermarks)
@@ -58,28 +59,56 @@ export default function MapView({
 
       const map = mapInstanceRef.current;
 
-      // Clear existing markers
+      // Clear existing markers & circles
       map.eachLayer((layer: any) => {
-        if (layer instanceof L.Marker || layer instanceof L.CircleMarker) {
+        if (layer instanceof L.Marker || layer instanceof L.CircleMarker || layer instanceof L.Circle) {
           map.removeLayer(layer);
         }
       });
 
-      // User Location Marker & Auto-Centering
-      if (userLocation) {
+      // User Location Marker, High-Precision Accuracy Halo & Anti-Jitter Viewport Centering
+      if (userLocation && userLocation.lat !== 0 && userLocation.lng !== 0) {
+        const accuracyMeters = userLocation.accuracy ? Math.round(userLocation.accuracy) : 15;
+
+        // Accuracy Halo Ring
+        L.circle([userLocation.lat, userLocation.lng], {
+          radius: Math.min(Math.max(accuracyMeters, 10), 120),
+          color: "#3b82f6",
+          fillColor: "#3b82f6",
+          fillOpacity: 0.12,
+          weight: 1.5,
+          dashArray: "4, 4",
+        }).addTo(map);
+
+        // High-Precision Core Pin
         const userIcon = L.divIcon({
           className: "user-loc-pin",
-          html: `<div style="background-color: #3b82f6; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 14px rgba(59, 130, 246, 0.9);"></div>`,
+          html: `<div style="background-color: #2563eb; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 14px rgba(37, 99, 235, 0.9);"></div>`,
           iconSize: [18, 18],
           iconAnchor: [9, 9],
         });
+
         L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
           .addTo(map)
-          .bindPopup("<b>📍 Your Current Location</b>");
+          .bindPopup(`<b>📍 Your Location</b><br><small style="color:#2563eb">GPS Accuracy: ±${accuracyMeters}m</small>`);
 
-        // Pan map into user's exact neighborhood / colony
+        // Anti-jitter viewport centering: only fly map if distance moved is significant or first load
         if (!interactiveSelect) {
-          map.setView([userLocation.lat, userLocation.lng], 15);
+          const prev = lastCenteredLocationRef.current;
+          let shouldCenter = true;
+          if (prev) {
+            const dLat = Math.abs(prev.lat - userLocation.lat);
+            const dLng = Math.abs(prev.lng - userLocation.lng);
+            // ~10 meters threshold
+            if (dLat < 0.0001 && dLng < 0.0001) {
+              shouldCenter = false;
+            }
+          }
+
+          if (shouldCenter) {
+            map.flyTo([userLocation.lat, userLocation.lng], 15, { duration: 0.8 });
+            lastCenteredLocationRef.current = { lat: userLocation.lat, lng: userLocation.lng };
+          }
         }
       }
 
