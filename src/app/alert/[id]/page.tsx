@@ -32,7 +32,7 @@ import Navbar from "@/components/Navbar";
 import CommentsSection from "@/components/CommentsSection";
 import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS, VetClinic, VET_FACILITY_LABELS } from "@/lib/types";
 import { DEMO_REPORTS, supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { formatTimeAgo, calculateDistanceMeters, formatDistance } from "@/lib/geo";
+import { formatTimeAgo, calculateDistanceMeters, formatDistance, getFastestNavigationUrl, getCachedCoordinates, getDeviceGeolocation } from "@/lib/geo";
 import { getStoredVets } from "@/lib/vetsData";
 import { isMyReport, removeMyReportId, getUserName, syncStatsToCloud, isAdmin } from "@/lib/user";
 
@@ -53,6 +53,7 @@ export default function AlertDetailPage() {
   const id = params?.id as string;
 
   const [report, setReport] = useState<DogReport | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() => getCachedCoordinates());
   const [helperName, setHelperName] = useState<string>("Community Feeder");
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [shareCopied, setShareCopied] = useState<boolean>(false);
@@ -65,7 +66,11 @@ export default function AlertDetailPage() {
   // Safe coordinates (always calculated at top level)
   const safeLat = typeof report?.latitude === "number" ? report.latitude : (parseFloat(String(report?.latitude)) || 19.3824);
   const safeLng = typeof report?.longitude === "number" ? report.longitude : (parseFloat(String(report?.longitude)) || 72.8291);
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${safeLat},${safeLng}`;
+
+  // Live traffic-calculated fastest and shortest routes
+  const fastestDrivingUrl = getFastestNavigationUrl(safeLat, safeLng, userLocation?.lat, userLocation?.lng, "driving");
+  const fastestTwoWheelerUrl = getFastestNavigationUrl(safeLat, safeLng, userLocation?.lat, userLocation?.lng, "two-wheeler");
+  const fastestWalkingUrl = getFastestNavigationUrl(safeLat, safeLng, userLocation?.lat, userLocation?.lng, "walking");
 
   // Calculate nearest emergency vet or ambulance facility (Hook called unconditionally)
   const nearestVet = useMemo<{ vet: VetClinic; distance: number } | null>(() => {
@@ -138,6 +143,13 @@ export default function AlertDetailPage() {
     };
 
     if (id) fetchSingleReport();
+
+    // Auto-detect volunteer's current GPS position for instant shortest route calculation
+    getDeviceGeolocation(false).then((loc) => {
+      if (loc && loc.lat !== 0 && loc.lng !== 0) {
+        setUserLocation({ lat: loc.lat, lng: loc.lng });
+      }
+    });
   }, [id]);
 
   useEffect(() => {
@@ -437,13 +449,13 @@ export default function AlertDetailPage() {
                   </a>
 
                   <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${nearestVet.vet.latitude},${nearestVet.vet.longitude}`}
+                    href={nearestVet ? getFastestNavigationUrl(nearestVet.vet.latitude, nearestVet.vet.longitude, userLocation?.lat, userLocation?.lng, "driving") : "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-darkBorder text-neutral-200 text-xs font-bold transition-all active:scale-95 text-center"
                   >
                     <Navigation className="w-3.5 h-3.5 text-pawAmber" />
-                    <span>Directions</span>
+                    <span>Fastest Route</span>
                   </a>
                 </div>
 
@@ -473,9 +485,14 @@ export default function AlertDetailPage() {
 
             {/* Location & Map Box */}
             <div className="space-y-3 pt-2 border-t border-darkBorder">
-              <h3 className="text-xs font-bold text-pawAmber uppercase tracking-wider">
-                Exact Dog Location
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-pawAmber uppercase tracking-wider">
+                  Exact Dog Location
+                </h3>
+                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-800/40">
+                  ⚡ Live GPS Pinpoint
+                </span>
+              </div>
 
               <div className="bg-darkBg border border-darkBorder rounded-2xl p-4 space-y-3">
                 <div className="flex items-start space-x-2">
@@ -497,20 +514,44 @@ export default function AlertDetailPage() {
 
                 {/* Embedded Map */}
                 <div className="h-48 w-full rounded-xl overflow-hidden border border-darkBorder">
-                  <MapView reports={[report]} />
+                  <MapView reports={[report]} userLocation={userLocation} />
                 </div>
 
-                {/* Turn-by-Turn Directions Button */}
-                <a
-                  href={googleMapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3 rounded-xl bg-pawAmber hover:bg-pawAmber-hover text-white text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 transition-all shadow-md shadow-pawAmber/10"
-                >
-                  <Navigation className="w-4 h-4" />
-                  <span>Open Google Maps Turn-by-Turn Navigation</span>
-                  <ExternalLink className="w-3.5 h-3.5 opacity-70" />
-                </a>
+                {/* Live Turn-by-Turn Directions Buttons */}
+                <div className="space-y-2 pt-1">
+                  <a
+                    href={fastestDrivingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-pawAmber to-amber-500 hover:from-pawAmber-hover hover:to-amber-600 text-white text-xs sm:text-sm font-extrabold flex items-center justify-center space-x-2 transition-all shadow-lg shadow-pawAmber/20 active:scale-[0.99]"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    <span>Start Live GPS Navigation (Fastest Route)</span>
+                    <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                  </a>
+
+                  {/* Multi-modal Shortcut / Two-Wheeler / Walking Buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <a
+                      href={fastestTwoWheelerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 px-3 rounded-xl bg-neutral-800/90 hover:bg-neutral-700 border border-darkBorder text-neutral-200 text-[11px] sm:text-xs font-bold flex items-center justify-center space-x-1.5 transition-all text-center active:scale-95"
+                    >
+                      <span>🛵</span>
+                      <span>Shortest Bike / Shortcut</span>
+                    </a>
+                    <a
+                      href={fastestWalkingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 px-3 rounded-xl bg-neutral-800/90 hover:bg-neutral-700 border border-darkBorder text-neutral-200 text-[11px] sm:text-xs font-bold flex items-center justify-center space-x-1.5 transition-all text-center active:scale-95"
+                    >
+                      <span>🚶</span>
+                      <span>Walking Path</span>
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
 

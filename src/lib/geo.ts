@@ -32,6 +32,42 @@ export function formatDistance(meters: number | null | undefined): string {
   return `${(meters / 1000).toFixed(1)} km away`;
 }
 
+/**
+ * Generates the fastest, most direct Google Maps Turn-by-Turn GPS Navigation URL.
+ * Automatically injects:
+ * 1. Exact destination coordinates (high-precision sub-meter lock)
+ * 2. Origin coordinates (user's live GPS location) to ensure Google Maps calculates the shortest path immediately
+ * 3. dir_action=navigate to immediately start real-time traffic-optimized GPS guidance
+ * 4. travelmode=driving to find the fastest route
+ */
+export function getFastestNavigationUrl(
+  destLat: number,
+  destLng: number,
+  originLat?: number | null,
+  originLng?: number | null,
+  mode: "driving" | "two-wheeler" | "walking" = "driving"
+): string {
+  const cleanDestLat = Number(destLat).toFixed(6);
+  const cleanDestLng = Number(destLng).toFixed(6);
+
+  // If user origin GPS coordinates are available, pass origin for instant pinpoint shortest route
+  if (
+    originLat !== undefined &&
+    originLat !== null &&
+    originLng !== undefined &&
+    originLng !== null &&
+    originLat !== 0 &&
+    originLng !== 0
+  ) {
+    const cleanOriginLat = Number(originLat).toFixed(6);
+    const cleanOriginLng = Number(originLng).toFixed(6);
+    return `https://www.google.com/maps/dir/?api=1&origin=${cleanOriginLat},${cleanOriginLng}&destination=${cleanDestLat},${cleanDestLng}&travelmode=${mode}&dir_action=navigate`;
+  }
+
+  // Fallback: Launch turn-by-turn navigation directly to target destination from current GPS
+  return `https://www.google.com/maps/dir/?api=1&destination=${cleanDestLat},${cleanDestLng}&travelmode=${mode}&dir_action=navigate`;
+}
+
 export function formatTimeAgo(timestampString?: string | null): string {
   if (!timestampString) return "Just now";
   const date = new Date(timestampString);

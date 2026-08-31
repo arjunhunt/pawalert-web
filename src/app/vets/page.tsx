@@ -22,7 +22,7 @@ import {
 import Navbar from "@/components/Navbar";
 import { VetClinic, VetFacilityType, VET_FACILITY_LABELS } from "@/lib/types";
 import { getStoredVets, saveCustomVet, fetchGlobalNearbyVets } from "@/lib/vetsData";
-import { calculateDistanceMeters, formatDistance, getCachedCoordinates, getDeviceGeolocation } from "@/lib/geo";
+import { calculateDistanceMeters, formatDistance, getCachedCoordinates, getDeviceGeolocation, getFastestNavigationUrl } from "@/lib/geo";
 
 export default function VetsDirectoryPage() {
   const [vets, setVets] = useState<VetClinic[]>([]);
@@ -354,7 +354,7 @@ export default function VetsDirectoryPage() {
           ) : (
             filteredVets.map(({ vet, distance }) => {
               const labelInfo = VET_FACILITY_LABELS[vet.type] || VET_FACILITY_LABELS.CLINIC;
-              const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${vet.latitude},${vet.longitude}`;
+              const mapsUrl = getFastestNavigationUrl(vet.latitude, vet.longitude, userLocation?.lat, userLocation?.lng, "driving");
 
               return (
                 <div
