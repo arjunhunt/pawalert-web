@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dog, PlusCircle, MapPin, User, Navigation, Trophy, Stethoscope } from "lucide-react";
+import { Dog, PlusCircle, MapPin, User, Navigation, Trophy, Stethoscope, HeartPulse } from "lucide-react";
 
 interface NavbarProps {
   userLocation?: { lat: number; lng: number } | null;
@@ -63,6 +63,19 @@ export default function Navbar({
               </span>
             </button>
           )}
+
+          {/* 24/7 Emergency Vet & Ambulance Directory Link */}
+          <Link
+            href="/vets"
+            className={`p-2 rounded-xl border transition-colors ${
+              pathname === "/vets"
+                ? "bg-red-950/60 text-red-300 border-red-500/60"
+                : "bg-neutral-800/40 text-red-400 border-darkBorder hover:text-red-300 hover:bg-neutral-800"
+            }`}
+            title="24/7 Emergency Vet & Ambulance Directory"
+          >
+            <HeartPulse className="w-5 h-5 text-red-400" />
+          </Link>
 
           {/* PawMedic AI Triage Link */}
           <Link

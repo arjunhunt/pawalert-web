@@ -78,3 +78,31 @@ export const STATUS_LABELS: Record<ReportStatus, { label: string; color: string;
   IN_PROGRESS: { label: "Being Handled", color: "#FFB300", bg: "bg-amber-950/40 text-amber-400 border-amber-800/50" },
   RESOLVED: { label: "Resolved", color: "#43A047", bg: "bg-green-950/40 text-green-400 border-green-800/50" },
 };
+
+export type VetFacilityType = "HOSPITAL_24X7" | "AMBULANCE" | "CLINIC" | "NGO_SHELTER";
+
+export interface VetClinic {
+  id: string;
+  name: string;
+  type: VetFacilityType;
+  phone: string;
+  emergencyPhone?: string;
+  is24x7: boolean;
+  address: string;
+  area: string;
+  city: string;
+  state: string;
+  latitude: number;
+  longitude: number;
+  facilities: string[];
+  isVerified: boolean;
+  notes?: string;
+}
+
+export const VET_FACILITY_LABELS: Record<VetFacilityType, { label: string; icon: string; bg: string }> = {
+  HOSPITAL_24X7: { label: "24/7 Trauma Hospital", icon: "🚨", bg: "bg-red-950/40 text-red-400 border-red-800/40" },
+  AMBULANCE: { label: "Animal Ambulance", icon: "🚐", bg: "bg-amber-950/40 text-amber-400 border-amber-800/40" },
+  CLINIC: { label: "Veterinary Clinic", icon: "🩺", bg: "bg-blue-950/40 text-blue-400 border-blue-800/40" },
+  NGO_SHELTER: { label: "NGO / Free Stray Care", icon: "🐾", bg: "bg-emerald-950/40 text-emerald-400 border-emerald-800/40" },
+};
+

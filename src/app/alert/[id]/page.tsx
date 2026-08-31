@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -25,13 +25,17 @@ import {
   Stethoscope,
   Sparkles,
   Loader2,
+  HeartPulse,
+  Phone,
+  Building2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import CommentsSection from "@/components/CommentsSection";
 import PawMedicTriageCard from "@/components/PawMedicTriageCard";
-import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS, PawMedicResult } from "@/lib/types";
+import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS, PawMedicResult, VetClinic, VET_FACILITY_LABELS } from "@/lib/types";
 import { DEMO_REPORTS, supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { formatTimeAgo } from "@/lib/geo";
+import { formatTimeAgo, calculateDistanceMeters, formatDistance } from "@/lib/geo";
+import { getStoredVets } from "@/lib/vetsData";
 import { isMyReport, removeMyReportId, getUserName, syncStatsToCloud, isAdmin } from "@/lib/user";
 
 // Dynamic map preview for detail screen
@@ -248,6 +252,32 @@ export default function AlertDetailPage() {
 
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${report.latitude},${report.longitude}`;
 
+  // Calculate nearest emergency vet or ambulance facility
+  const nearestVet = useMemo<{ vet: VetClinic; distance: number } | null>(() => {
+    if (!report) return null;
+    const allVets = getStoredVets();
+    let bestVet: VetClinic | null = null;
+    let minDistance = Infinity;
+
+    for (const vet of allVets) {
+      const dist = calculateDistanceMeters(
+        report.latitude,
+        report.longitude,
+        vet.latitude,
+        vet.longitude
+      );
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestVet = vet;
+      }
+    }
+
+    if (bestVet) {
+      return { vet: bestVet, distance: minDistance };
+    }
+    return null;
+  }, [report]);
+
   return (
     <div className="min-h-screen flex flex-col bg-darkBg">
       <Navbar />
@@ -420,6 +450,63 @@ export default function AlertDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* 🚨 Nearest Emergency Vet & Ambulance Card */}
+            {nearestVet && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-red-950/40 via-darkBg to-darkBg border border-red-800/40 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center space-x-2">
+                    <HeartPulse className="w-5 h-5 text-red-400 shrink-0" />
+                    <div>
+                      <h4 className="text-[11px] font-bold text-red-300 uppercase tracking-wider">
+                        Nearest Emergency Vet / Ambulance
+                      </h4>
+                      <div className="text-sm font-black text-white">
+                        {nearestVet.vet.name}
+                      </div>
+                    </div>
+                  </div>
+
+                  <span className="text-xs font-bold text-red-300 bg-red-950/60 px-2.5 py-1 rounded-xl border border-red-800/60 flex items-center space-x-1 shrink-0">
+                    <MapPin className="w-3 h-3 text-red-400" />
+                    <span>{formatDistance(nearestVet.distance)}</span>
+                  </span>
+                </div>
+
+                <p className="text-xs text-neutral-300">
+                  📍 {nearestVet.vet.address}, {nearestVet.vet.area}
+                </p>
+
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <a
+                    href={`tel:${nearestVet.vet.emergencyPhone || nearestVet.vet.phone}`}
+                    className="flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all active:scale-95 text-center"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>Call Helpline</span>
+                  </a>
+
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${nearestVet.vet.latitude},${nearestVet.vet.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-darkBorder text-neutral-200 text-xs font-bold transition-all active:scale-95 text-center"
+                  >
+                    <Navigation className="w-3.5 h-3.5 text-pawAmber" />
+                    <span>Directions</span>
+                  </a>
+                </div>
+
+                <div className="text-center pt-1">
+                  <Link
+                    href="/vets"
+                    className="text-[11px] text-neutral-400 hover:text-white transition-colors underline"
+                  >
+                    View all 24/7 emergency clinics & ambulances →
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* Reporter Info */}
             <div className="flex items-center space-x-2.5 p-3.5 rounded-2xl bg-darkBg border border-darkBorder text-xs text-neutral-300">
