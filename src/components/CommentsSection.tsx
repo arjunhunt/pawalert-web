@@ -18,7 +18,7 @@ import {
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { getUserId, getUserName, isAdmin } from "@/lib/user";
 import { formatTimeAgo } from "@/lib/geo";
-import { sanitizeText, checkRateLimit } from "@/lib/security";
+import { sanitizeText, checkRateLimit, containsSuspiciousLinks } from "@/lib/security";
 
 interface CommentsSectionProps {
   reportId: string;
@@ -121,6 +121,11 @@ export default function CommentsSection({
 
     if (!content.trim()) return;
 
+    if (containsSuspiciousLinks(content)) {
+      setRateLimitError("Links and external promotional URLs are not permitted in rescue updates.");
+      return;
+    }
+
     setIsSubmitting(true);
     setRateLimitError("");
 
@@ -168,8 +173,16 @@ export default function CommentsSection({
     }
   };
 
-  // Delete own comment
+  // Delete comment with strict authorization check
   const handleDeleteComment = async (commentId: string) => {
+    const target = comments.find((c) => c.id === commentId);
+    if (!target) return;
+
+    if (!isSuperAdmin && target.author_id !== currentUserId) {
+      alert("You can only delete your own rescue updates.");
+      return;
+    }
+
     try {
       if (isSupabaseConfigured && supabase) {
         await supabase.from("comments").delete().eq("id", commentId);

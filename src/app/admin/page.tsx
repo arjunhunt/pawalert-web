@@ -20,7 +20,7 @@ import {
 import Navbar from "@/components/Navbar";
 import { DogReport, ReportComment, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { isAdmin, unlockAdmin, lockAdmin } from "@/lib/user";
+import { isAdmin, unlockAdminAsync, lockAdmin } from "@/lib/user";
 import { formatTimeAgo } from "@/lib/geo";
 
 export default function AdminPage() {
@@ -72,11 +72,11 @@ export default function AdminPage() {
     }
   };
 
-  const handleUnlock = (e: React.FormEvent) => {
+  const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
-    const success = unlockAdmin(passcode);
+    const success = await unlockAdminAsync(passcode);
     if (success) {
       setIsSuperAdmin(true);
       setSuccessMsg("👑 Founder Super Admin Mode Unlocked!");

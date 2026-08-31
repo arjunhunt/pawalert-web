@@ -21,6 +21,18 @@ export default function PhotoUpload({
 
   // Safe and lightweight image compression using HTMLImageElement
   const processImageFile = (file: File) => {
+    // 1. File Type Guard: Only allow valid image formats (JPEG, PNG, WebP, HEIC)
+    if (!file || !file.type.startsWith("image/")) {
+      alert("Please select a valid image file (JPG, PNG, or WebP).");
+      return;
+    }
+
+    // 2. File Size Guard: Reject files exceeding 15MB to prevent memory exhaustion
+    if (file.size > 15 * 1024 * 1024) {
+      alert("Photo file is too large (maximum 15MB). Please choose a smaller photo.");
+      return;
+    }
+
     setIsUploading(true);
 
     const reader = new FileReader();

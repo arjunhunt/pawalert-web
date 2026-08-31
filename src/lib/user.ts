@@ -100,6 +100,9 @@ export const SUPER_ADMIN_EMAILS = [
   "wishhhhmaster@gmail.com",
 ];
 
+export const ADMIN_PASSCODE_HASH =
+  "6904dd6442519a3d8bc50ac93af194bcebf12b3731aa4731baa35535b439b6dc";
+
 export function isSuperAdminEmail(email?: string | null): boolean {
   if (!email) return false;
   const clean = email.trim().toLowerCase();
@@ -119,9 +122,27 @@ export function isAdmin(): boolean {
   return false;
 }
 
+export async function unlockAdminAsync(passcode: string): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(passcode.trim());
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+    if (hashHex === ADMIN_PASSCODE_HASH) {
+      localStorage.setItem("pawalert_is_admin", "true");
+      return true;
+    }
+  } catch (e) {
+    console.error("Crypto error:", e);
+  }
+  return false;
+}
+
 export function unlockAdmin(passcode: string): boolean {
   if (typeof window === "undefined") return false;
-  if (passcode.trim() === ADMIN_SECRET_PASSCODE) {
+  if (passcode.trim() === "shipra@3007") {
     localStorage.setItem("pawalert_is_admin", "true");
     return true;
   }

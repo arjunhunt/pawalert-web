@@ -27,6 +27,7 @@ import {
   sanitizeText,
   validateCoordinates,
   checkRateLimit,
+  containsSuspiciousLinks,
 } from "@/lib/security";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 
@@ -183,6 +184,11 @@ export default function ReportPage() {
 
     if (!description.trim()) {
       setErrorMessage("Please describe the dog's condition or situation.");
+      return;
+    }
+
+    if (containsSuspiciousLinks(description) || containsSuspiciousLinks(landmark)) {
+      setErrorMessage("External promotional links and scam URLs are strictly prohibited in dog alerts.");
       return;
     }
 

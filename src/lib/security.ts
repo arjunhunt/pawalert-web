@@ -22,6 +22,16 @@ export function isSafeImageUrl(url: string): boolean {
   return false;
 }
 
+export function escapeHtml(unsafe: string | null | undefined): string {
+  if (!unsafe) return "";
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export function sanitizeText(text: string, maxLength: number = 1000): string {
   if (!text || typeof text !== "string") return "";
   // Strip control characters while keeping standard whitespace

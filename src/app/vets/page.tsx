@@ -23,6 +23,7 @@ import Navbar from "@/components/Navbar";
 import { VetClinic, VetFacilityType, VET_FACILITY_LABELS } from "@/lib/types";
 import { getStoredVets, saveCustomVet, fetchGlobalNearbyVets } from "@/lib/vetsData";
 import { calculateDistanceMeters, formatDistance, getCachedCoordinates, getDeviceGeolocation, getFastestNavigationUrl } from "@/lib/geo";
+import { sanitizeText } from "@/lib/security";
 
 export default function VetsDirectoryPage() {
   const [vets, setVets] = useState<VetClinic[]>([]);
@@ -163,26 +164,33 @@ export default function VetsDirectoryPage() {
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName || !newPhone || !newArea || !newCity) return;
+    const cleanName = sanitizeText(newName, 100);
+    const cleanPhone = sanitizeText(newPhone, 30);
+    const cleanArea = sanitizeText(newArea, 100);
+    const cleanCity = sanitizeText(newCity, 100);
+    const cleanAddress = sanitizeText(newAddress, 200);
+    const cleanNotes = sanitizeText(newNotes, 300);
+
+    if (!cleanName || !cleanPhone || !cleanArea || !cleanCity) return;
 
     const facList = newFacilities
       .split(",")
-      .map((f) => f.trim())
+      .map((f) => sanitizeText(f, 40))
       .filter(Boolean);
 
     const saved = saveCustomVet({
-      name: newName,
+      name: cleanName,
       type: newType,
-      phone: newPhone,
+      phone: cleanPhone,
       is24x7: newIs24x7,
-      address: newAddress || `${newArea}, ${newCity}`,
-      area: newArea,
-      city: newCity,
+      address: cleanAddress || `${cleanArea}, ${cleanCity}`,
+      area: cleanArea,
+      city: cleanCity,
       state: "India",
       latitude: userLocation?.lat || 19.3824,
       longitude: userLocation?.lng || 72.8291,
       facilities: facList.length > 0 ? facList : ["Emergency Care", "OPD"],
-      notes: newNotes,
+      notes: cleanNotes,
     });
 
     setVets((prev) => [saved, ...prev]);

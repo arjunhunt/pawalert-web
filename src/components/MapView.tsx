@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
+import { escapeHtml } from "@/lib/security";
 
 interface MapViewProps {
   reports: DogReport[];
@@ -180,12 +181,12 @@ export default function MapView({
               ${catInfo.icon} ${catInfo.label}
             </div>
             <div style="font-size: 12px; color: #444; margin-bottom: 8px;">
-              ${report.address || "Location recorded"} ${report.landmark ? `<br><small style="color:#d97706">📍 ${report.landmark}</small>` : ""}
+              ${escapeHtml(report.address) || "Location recorded"} ${report.landmark ? `<br><small style="color:#d97706">📍 ${escapeHtml(report.landmark)}</small>` : ""}
             </div>
             ${
               interactiveSelect
                 ? `<div style="font-size: 11px; color: #EF6C00; font-weight: bold;">📍 Drag pin or tap map to adjust spot</div>`
-                : `<a href="/alert/${report.id}" style="
+                : `<a href="/alert/${encodeURIComponent(report.id)}" style="
                     display: block;
                     text-align: center;
                     background-color: #EF6C00;
