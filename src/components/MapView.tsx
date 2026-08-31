@@ -35,25 +35,42 @@ export default function MapView({
       const centerLat = userLocation?.lat || reports[0]?.latitude || 20.1759;
       const centerLng = userLocation?.lng || reports[0]?.longitude || 72.7549;
 
-      if (!mapInstanceRef.current) {
-        const map = L.map(mapContainerRef.current).setView([centerLat, centerLng], 15);
-        mapInstanceRef.current = map;
+      // If map is already initialized on this container, reuse or update it
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.setView([centerLat, centerLng], mapInstanceRef.current.getZoom());
+        } catch (e) {}
+      } else {
+        // Clean any residual leaflet id on container
+        if ((mapContainerRef.current as any)._leaflet_id) {
+          (mapContainerRef.current as any)._leaflet_id = null;
+        }
 
-        // OpenStreetMap Tile Layer (100% Free, High Precision, No Watermarks)
-        L.tileLayer(
-          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          {
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19,
+        try {
+          const map = L.map(mapContainerRef.current, {
+            zoomControl: true,
+            scrollWheelZoom: !interactiveSelect,
+          }).setView([centerLat, centerLng], 15);
+          mapInstanceRef.current = map;
+
+          // OpenStreetMap Tile Layer (100% Free, High Precision, No Watermarks)
+          L.tileLayer(
+            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            {
+              attribution:
+                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+              maxZoom: 19,
+            }
+          ).addTo(map);
+
+          // Allow clicking on the map to pick coordinates when creating a report
+          if (interactiveSelect && onSelectCoordinate) {
+            map.on("click", (e: any) => {
+              onSelectCoordinate(e.latlng.lat, e.latlng.lng);
+            });
           }
-        ).addTo(map);
-
-        // Allow clicking on the map to pick coordinates when creating a report
-        if (interactiveSelect && onSelectCoordinate) {
-          map.on("click", (e: any) => {
-            onSelectCoordinate(e.latlng.lat, e.latlng.lng);
-          });
+        } catch (err) {
+          console.warn("Leaflet init handled:", err);
         }
       }
 
@@ -188,6 +205,12 @@ export default function MapView({
 
     return () => {
       isMounted = false;
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {}
+        mapInstanceRef.current = null;
+      }
     };
   }, [reports, userLocation, interactiveSelect, onSelectCoordinate]);
 

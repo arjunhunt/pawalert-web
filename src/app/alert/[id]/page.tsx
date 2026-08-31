@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import confetti from "canvas-confetti";
 import {
   ArrowLeft,
   Share2,
@@ -203,11 +202,16 @@ export default function AlertDetailPage() {
     setIsUpdating(false);
 
     // Trigger celebration confetti
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
+    try {
+      const confettiModule = (await import("canvas-confetti")).default;
+      confettiModule({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+    } catch (e) {
+      // Ignore confetti failures
+    }
   };
 
   // Delete report
