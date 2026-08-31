@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
   LayoutGrid,
@@ -262,28 +263,39 @@ export default function Home() {
 
         {/* Top Control Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-darkCard/80 backdrop-blur-md p-4 rounded-3xl border border-darkBorder">
-          {/* Status Tabs */}
-          <div className="flex items-center space-x-1 bg-darkBg p-1 rounded-2xl border border-darkBorder">
-            <button
-              onClick={() => setSelectedStatus("ACTIVE")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                selectedStatus === "ACTIVE"
-                  ? "bg-pawAmber text-white shadow-md shadow-pawAmber/20"
-                  : "text-neutral-400 hover:text-white"
-              }`}
+          {/* Status Tabs & Report Dog Button */}
+          <div className="flex items-center flex-wrap gap-2.5 w-full sm:w-auto">
+            <div className="flex items-center space-x-1 bg-darkBg p-1 rounded-2xl border border-darkBorder">
+              <button
+                onClick={() => setSelectedStatus("ACTIVE")}
+                className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  selectedStatus === "ACTIVE"
+                    ? "bg-pawAmber text-white shadow-md shadow-pawAmber/20"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Needs Help (Active)
+              </button>
+              <button
+                onClick={() => setSelectedStatus("ALL")}
+                className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  selectedStatus === "ALL"
+                    ? "bg-neutral-800 text-white"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                All Alerts
+              </button>
+            </div>
+
+            {/* + Report Dog Button */}
+            <Link
+              href="/report"
+              className="flex items-center space-x-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white px-3.5 sm:px-4 py-2 rounded-2xl text-xs font-black shadow-lg shadow-pawAmber/20 transition-all hover:scale-105 active:scale-95 shrink-0"
             >
-              Needs Help (Active)
-            </button>
-            <button
-              onClick={() => setSelectedStatus("ALL")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                selectedStatus === "ALL"
-                  ? "bg-neutral-800 text-white"
-                  : "text-neutral-400 hover:text-white"
-              }`}
-            >
-              All Alerts
-            </button>
+              <PlusCircle className="w-4 h-4" />
+              <span>+ Report Dog</span>
+            </Link>
           </div>
 
           {/* Location & View Controls */}

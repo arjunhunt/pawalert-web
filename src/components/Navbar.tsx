@@ -64,15 +64,6 @@ export default function Navbar({
             </button>
           )}
 
-          {/* Report Button */}
-          <Link
-            href="/report"
-            className="flex items-center space-x-1.5 bg-pawAmber hover:bg-pawAmber-hover text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-pawAmber/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Report Dog</span>
-          </Link>
-
           {/* PawMedic AI Triage Link */}
           <Link
             href="/pawmedic"
