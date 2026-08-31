@@ -61,6 +61,38 @@ export default function AlertDetailPage() {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isAuthor, setIsAuthor] = useState<boolean>(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
+
+  // Safe coordinates (always calculated at top level)
+  const safeLat = typeof report?.latitude === "number" ? report.latitude : (parseFloat(String(report?.latitude)) || 19.3824);
+  const safeLng = typeof report?.longitude === "number" ? report.longitude : (parseFloat(String(report?.longitude)) || 72.8291);
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${safeLat},${safeLng}`;
+
+  // Calculate nearest emergency vet or ambulance facility (Hook called unconditionally)
+  const nearestVet = useMemo<{ vet: VetClinic; distance: number } | null>(() => {
+    if (!report) return null;
+    const allVets = getStoredVets();
+    let bestVet: VetClinic | null = null;
+    let minDistance = Infinity;
+
+    for (const vet of allVets) {
+      const dist = calculateDistanceMeters(
+        safeLat,
+        safeLng,
+        vet.latitude,
+        vet.longitude
+      );
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestVet = vet;
+      }
+    }
+
+    if (bestVet) {
+      return { vet: bestVet, distance: minDistance };
+    }
+    return null;
+  }, [report, safeLat, safeLng]);
+
   useEffect(() => {
     setHelperName(getUserName());
     setIsSuperAdmin(isAdmin());
@@ -137,8 +169,8 @@ export default function AlertDetailPage() {
     );
   }
 
-  const catInfo = PROBLEM_TYPE_LABELS[report.problem_type] || PROBLEM_TYPE_LABELS.OTHER;
-  const statusInfo = STATUS_LABELS[report.status] || STATUS_LABELS.OPEN;
+  const catInfo = (report.problem_type && PROBLEM_TYPE_LABELS[report.problem_type]) ? PROBLEM_TYPE_LABELS[report.problem_type] : PROBLEM_TYPE_LABELS.OTHER;
+  const statusInfo = (report.status && STATUS_LABELS[report.status]) ? STATUS_LABELS[report.status] : STATUS_LABELS.OPEN;
 
   // Claim report
   const handleClaim = async () => {
@@ -243,36 +275,6 @@ export default function AlertDetailPage() {
       setTimeout(() => setShareCopied(false), 2000);
     }
   };
-
-  const safeLat = typeof report.latitude === "number" ? report.latitude : (parseFloat(String(report.latitude)) || 19.3824);
-  const safeLng = typeof report.longitude === "number" ? report.longitude : (parseFloat(String(report.longitude)) || 72.8291);
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${safeLat},${safeLng}`;
-
-  // Calculate nearest emergency vet or ambulance facility
-  const nearestVet = useMemo<{ vet: VetClinic; distance: number } | null>(() => {
-    if (!report) return null;
-    const allVets = getStoredVets();
-    let bestVet: VetClinic | null = null;
-    let minDistance = Infinity;
-
-    for (const vet of allVets) {
-      const dist = calculateDistanceMeters(
-        safeLat,
-        safeLng,
-        vet.latitude,
-        vet.longitude
-      );
-      if (dist < minDistance) {
-        minDistance = dist;
-        bestVet = vet;
-      }
-    }
-
-    if (bestVet) {
-      return { vet: bestVet, distance: minDistance };
-    }
-    return null;
-  }, [report, safeLat, safeLng]);
 
   return (
     <div className="min-h-screen flex flex-col bg-darkBg">
