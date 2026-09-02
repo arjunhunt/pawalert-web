@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dog, PlusCircle, MapPin, User, Navigation, Trophy, HeartPulse } from "lucide-react";
+import { Dog, PlusCircle, MapPin, User, Navigation, Trophy, HeartPulse, Car } from "lucide-react";
 
 interface NavbarProps {
   userLocation?: { lat: number; lng: number } | null;
@@ -63,6 +63,20 @@ export default function Navbar({
               </span>
             </button>
           )}
+
+          {/* Pet Travel & Road-Trip Emergency Companion */}
+          <Link
+            href="/pet-travel"
+            className={`p-2 rounded-xl border transition-colors flex items-center space-x-1.5 ${
+              pathname === "/pet-travel"
+                ? "bg-blue-950/60 text-blue-300 border-blue-500/60"
+                : "bg-neutral-800/40 text-blue-400 border-darkBorder hover:text-blue-300 hover:bg-neutral-800"
+            }`}
+            title="Pet Travel & Highway Emergency Companion"
+          >
+            <Car className="w-5 h-5 text-blue-400" />
+            <span className="text-xs font-bold text-blue-400 hidden lg:inline">Pet Travel</span>
+          </Link>
 
           {/* 24/7 Emergency Vet & Ambulance Directory Link */}
           <Link
