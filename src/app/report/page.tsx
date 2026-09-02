@@ -16,9 +16,12 @@ import {
   Loader2,
   CheckCircle2,
   Crosshair,
+  Mic,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PhotoUpload from "@/components/PhotoUpload";
+import VoiceSOSModal from "@/components/VoiceSOSModal";
+import { ParsedVoiceReport } from "@/lib/voiceParser";
 import { ProblemType, PROBLEM_TYPE_LABELS, DogReport } from "@/lib/types";
 import { reverseGeocodeDetailed, getAccurateGPSPosition, getCachedCoordinates, forwardGeocode } from "@/lib/geo";
 import { getUserId, getUserName, addMyReportId, syncStatsToCloud } from "@/lib/user";
@@ -97,13 +100,34 @@ export default function ReportPage() {
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState<boolean>(false);
 
   // Auto-detect browser GPS and user handle on mount
   useEffect(() => {
     const savedName = localStorage.getItem("pawalert_user_name");
     if (savedName) setReporterName(savedName);
     detectLocation();
+
+    // Check if voice report was initiated from home screen
+    try {
+      const draftRaw = sessionStorage.getItem("pawalert_voice_draft");
+      if (draftRaw) {
+        const draft: ParsedVoiceReport = JSON.parse(draftRaw);
+        handleApplyVoiceReport(draft);
+        sessionStorage.removeItem("pawalert_voice_draft");
+      }
+    } catch (e) {}
   }, []);
+
+  const handleApplyVoiceReport = (parsed: ParsedVoiceReport) => {
+    if (parsed.problemType) setSelectedCategory(parsed.problemType);
+    if (parsed.description) setDescription(parsed.description);
+    if (parsed.extractedLandmark) setLandmark(parsed.extractedLandmark);
+
+    if (!latitude || !longitude) {
+      detectLocation();
+    }
+  };
 
   const handlePhotoUploaded = (url: string) => {
     setPhotoUrl(url);
@@ -307,6 +331,33 @@ export default function ReportPage() {
             <p className="text-xs sm:text-sm text-neutral-400">
               Notify nearby volunteers and community feeders to assist this dog immediately.
             </p>
+          </div>
+
+          {/* 🎙️ 1-Tap Voice-to-Rescue AI Banner */}
+          <div className="p-4 rounded-3xl bg-gradient-to-r from-pawAmber/20 via-neutral-900 to-amber-950/30 border border-pawAmber/40 flex items-center justify-between gap-3 shadow-xl">
+            <div className="flex items-center space-x-3">
+              <div className="w-11 h-11 rounded-2xl bg-pawAmber/20 border border-pawAmber/30 flex items-center justify-center text-pawAmber shrink-0">
+                <Mic className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-xs font-black text-white">Voice SOS (Hands-Free AI)</span>
+                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-pawAmber text-black">Fast</span>
+                </div>
+                <p className="text-[11px] text-neutral-300">
+                  Speak in Hindi or English to auto-fill category, wound & landmark!
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsVoiceModalOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-pawAmber hover:bg-pawAmber-hover text-white text-xs font-black shadow-md shadow-pawAmber/20 transition-all active:scale-95 shrink-0 flex items-center space-x-1.5"
+            >
+              <Mic className="w-3.5 h-3.5" />
+              <span>Speak 🎙️</span>
+            </button>
           </div>
 
           {errorMessage && (
@@ -649,6 +700,13 @@ export default function ReportPage() {
           </form>
         </div>
       </main>
+
+      {/* 🎙️ Voice-to-Rescue AI Modal */}
+      <VoiceSOSModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onApplyVoiceReport={handleApplyVoiceReport}
+      />
     </div>
   );
 }
