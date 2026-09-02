@@ -182,6 +182,52 @@ export function cleanSpokenTranscript(text: string): string {
 }
 
 /**
+ * Robustly merges multi-segment speech recognition results on mobile/Android.
+ * Eliminates cumulative prefix repetition and overlapping utterances.
+ */
+export function combineSpeechResults(results: string[]): string {
+  let combined = "";
+
+  for (const text of results) {
+    const clean = text.trim();
+    if (!clean) continue;
+
+    if (!combined) {
+      combined = clean;
+      continue;
+    }
+
+    // 1. If clean is a direct expansion of combined (common in Android interim results)
+    if (clean.toLowerCase().startsWith(combined.toLowerCase())) {
+      combined = clean;
+    } else if (combined.toLowerCase().endsWith(clean.toLowerCase())) {
+      // 2. If clean is already present at end of combined
+      continue;
+    } else {
+      // 3. Suffix / prefix overlap merge
+      const combinedWords = combined.split(" ");
+      const cleanWords = clean.split(" ");
+      let overlap = 0;
+      for (let len = Math.min(combinedWords.length, cleanWords.length); len > 0; len--) {
+        const endOfCombined = combinedWords.slice(-len).join(" ").toLowerCase();
+        const startOfClean = cleanWords.slice(0, len).join(" ").toLowerCase();
+        if (endOfCombined === startOfClean) {
+          overlap = len;
+          break;
+        }
+      }
+      if (overlap > 0) {
+        combined += " " + cleanWords.slice(overlap).join(" ");
+      } else {
+        combined += " " + clean;
+      }
+    }
+  }
+
+  return cleanSpokenTranscript(combined);
+}
+
+/**
  * Intelligent Speech Analyzer for Emergency Dog Reports
  */
 export function parseSpokenRescueText(rawText: string): ParsedVoiceReport {

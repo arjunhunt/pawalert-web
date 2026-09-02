@@ -14,7 +14,12 @@ import {
   ArrowRight,
   Flame,
 } from "lucide-react";
-import { parseSpokenRescueText, ParsedVoiceReport } from "@/lib/voiceParser";
+import {
+  parseSpokenRescueText,
+  combineSpeechResults,
+  cleanSpokenTranscript,
+  ParsedVoiceReport,
+} from "@/lib/voiceParser";
 import { PROBLEM_TYPE_LABELS } from "@/lib/types";
 
 interface VoiceSOSModalProps {
@@ -36,6 +41,8 @@ export default function VoiceSOSModal({
   const [isSupported, setIsSupported] = useState<boolean>(true);
 
   const recognitionRef = useRef<any>(null);
+  const isRecordingRef = useRef<boolean>(false);
+  const accumulatedPhrasesRef = useRef<string[]>([]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -53,17 +60,18 @@ export default function VoiceSOSModal({
     setErrorMessage("");
     setParsedResult(null);
     setTranscript("");
+    accumulatedPhrasesRef.current = [];
 
     // 1. Explicitly prompt user for microphone permission via getUserMedia
     if (typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Release the audio track immediately after permission is confirmed
         stream.getTracks().forEach((track) => track.stop());
       } catch (permissionErr: any) {
         console.warn("Microphone permission error:", permissionErr);
         setErrorMessage("Microphone permission was blocked. Please tap 'Allow' in your browser permissions bar.");
         setIsRecording(false);
+        isRecordingRef.current = false;
         return;
       }
     }
@@ -75,37 +83,34 @@ export default function VoiceSOSModal({
     if (!SpeechRecognition) {
       setErrorMessage("Voice recognition is not supported in this browser. Please use Google Chrome, Safari, or Edge.");
       setIsRecording(false);
+      isRecordingRef.current = false;
       return;
     }
 
     try {
       const recognition = new SpeechRecognition();
-      recognition.continuous = true;
+      // On mobile Android, continuous=false prevents Chrome internal buffer duplication
+      recognition.continuous = false;
       recognition.interimResults = true;
       recognition.lang = language;
 
       recognition.onstart = () => {
         setIsRecording(true);
+        isRecordingRef.current = true;
         setErrorMessage("");
       };
 
       recognition.onresult = (event: any) => {
-        let finalStr = "";
-        let latestInterim = "";
+        const currentSegments: string[] = [...accumulatedPhrasesRef.current];
 
         for (let i = 0; i < event.results.length; i++) {
           const res = event.results[i];
-          if (res && res[0]) {
-            if (res.isFinal) {
-              finalStr += res[0].transcript.trim() + " ";
-            } else {
-              // Crucial: Overwrite with latest interim hypothesis (prevents Android duplication)
-              latestInterim = res[0].transcript.trim();
-            }
+          if (res && res[0] && res[0].transcript) {
+            currentSegments.push(res[0].transcript);
           }
         }
 
-        const combined = `${finalStr} ${latestInterim}`.replace(/\s+/g, " ").trim();
+        const combined = combineSpeechResults(currentSegments);
         if (combined) {
           setTranscript(combined);
           if (combined.length > 3) {
@@ -119,32 +124,46 @@ export default function VoiceSOSModal({
         console.warn("Speech error:", event.error);
         if (event.error === "not-allowed") {
           setErrorMessage("Microphone permission was not allowed. Please allow microphone in browser settings.");
+          setIsRecording(false);
+          isRecordingRef.current = false;
         } else if (event.error !== "no-speech") {
-          setErrorMessage(`Speech recognition error: ${event.error}`);
+          setErrorMessage(`Speech recognition notice: ${event.error}`);
         }
-        setIsRecording(false);
       };
 
       recognition.onend = () => {
-        setIsRecording(false);
+        // If user is still recording, save current transcript and seamlessly restart next turn
+        if (isRecordingRef.current) {
+          try {
+            recognition.start();
+          } catch (e) {
+            setIsRecording(false);
+            isRecordingRef.current = false;
+          }
+        } else {
+          setIsRecording(false);
+        }
       };
 
       recognitionRef.current = recognition;
+      isRecordingRef.current = true;
       recognition.start();
     } catch (e: any) {
       console.error("Failed to start speech recognition", e);
       setErrorMessage("Could not start microphone. Please check browser permissions.");
       setIsRecording(false);
+      isRecordingRef.current = false;
     }
   };
 
   const stopListening = () => {
+    isRecordingRef.current = false;
+    setIsRecording(false);
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
       } catch (e) {}
     }
-    setIsRecording(false);
   };
 
   const toggleRecording = () => {
