@@ -84,22 +84,34 @@ export default function VoiceSOSModal({
       recognition.interimResults = true;
       recognition.lang = language;
 
+      let finalAccumulated = "";
+
       recognition.onstart = () => {
         setIsRecording(true);
         setErrorMessage("");
       };
 
       recognition.onresult = (event: any) => {
-        let currentText = "";
-        for (let i = 0; i < event.results.length; i++) {
-          currentText += event.results[i][0].transcript + " ";
-        }
-        const trimmed = currentText.trim();
-        setTranscript(trimmed);
+        let interim = "";
 
-        if (trimmed.length > 3) {
-          const parsed = parseSpokenRescueText(trimmed);
-          setParsedResult(parsed);
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const res = event.results[i];
+          if (res && res[0]) {
+            if (res.isFinal) {
+              finalAccumulated += res[0].transcript + " ";
+            } else {
+              interim += res[0].transcript;
+            }
+          }
+        }
+
+        const combined = (finalAccumulated + interim).trim();
+        if (combined) {
+          setTranscript(combined);
+          if (combined.length > 3) {
+            const parsed = parseSpokenRescueText(combined);
+            setParsedResult(parsed);
+          }
         }
       };
 

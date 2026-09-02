@@ -167,10 +167,26 @@ const LANDMARK_ANCHORS = [
 ];
 
 /**
+ * Collapses consecutive stutter/repetition artifacts from mobile speech recognition
+ */
+export function cleanSpokenTranscript(text: string): string {
+  if (!text) return "";
+  const words = text.trim().split(/\s+/);
+  const result: string[] = [];
+  for (let i = 0; i < words.length; i++) {
+    if (i === 0 || words[i].toLowerCase() !== words[i - 1].toLowerCase()) {
+      result.push(words[i]);
+    }
+  }
+  return result.join(" ");
+}
+
+/**
  * Intelligent Speech Analyzer for Emergency Dog Reports
  */
 export function parseSpokenRescueText(rawText: string): ParsedVoiceReport {
-  const text = rawText.trim();
+  const cleaned = cleanSpokenTranscript(rawText);
+  const text = cleaned.trim();
   const lower = text.toLowerCase();
   const detectedKeywords: string[] = [];
 
