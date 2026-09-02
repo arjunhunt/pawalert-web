@@ -84,28 +84,28 @@ export default function VoiceSOSModal({
       recognition.interimResults = true;
       recognition.lang = language;
 
-      let finalAccumulated = "";
-
       recognition.onstart = () => {
         setIsRecording(true);
         setErrorMessage("");
       };
 
       recognition.onresult = (event: any) => {
-        let interim = "";
+        let finalStr = "";
+        let latestInterim = "";
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        for (let i = 0; i < event.results.length; i++) {
           const res = event.results[i];
           if (res && res[0]) {
             if (res.isFinal) {
-              finalAccumulated += res[0].transcript + " ";
+              finalStr += res[0].transcript.trim() + " ";
             } else {
-              interim += res[0].transcript;
+              // Crucial: Overwrite with latest interim hypothesis (prevents Android duplication)
+              latestInterim = res[0].transcript.trim();
             }
           }
         }
 
-        const combined = (finalAccumulated + interim).trim();
+        const combined = `${finalStr} ${latestInterim}`.replace(/\s+/g, " ").trim();
         if (combined) {
           setTranscript(combined);
           if (combined.length > 3) {
