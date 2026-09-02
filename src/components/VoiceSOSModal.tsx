@@ -42,7 +42,8 @@ export default function VoiceSOSModal({
 
   const recognitionRef = useRef<any>(null);
   const isRecordingRef = useRef<boolean>(false);
-  const accumulatedPhrasesRef = useRef<string[]>([]);
+  const accumulatedPastTextRef = useRef<string>("");
+  const currentTurnTextRef = useRef<string>("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -58,9 +59,14 @@ export default function VoiceSOSModal({
 
   const startListening = async () => {
     setErrorMessage("");
-    setParsedResult(null);
-    setTranscript("");
-    accumulatedPhrasesRef.current = [];
+    // If starting fresh with no previous transcript, reset accumulators
+    if (!transcript) {
+      setParsedResult(null);
+      accumulatedPastTextRef.current = "";
+    } else {
+      accumulatedPastTextRef.current = transcript.trim();
+    }
+    currentTurnTextRef.current = "";
 
     // 1. Explicitly prompt user for microphone permission via getUserMedia
     if (typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -89,7 +95,6 @@ export default function VoiceSOSModal({
 
     try {
       const recognition = new SpeechRecognition();
-      // On mobile Android, continuous=false prevents Chrome internal buffer duplication
       recognition.continuous = false;
       recognition.interimResults = true;
       recognition.lang = language;
@@ -101,7 +106,7 @@ export default function VoiceSOSModal({
       };
 
       recognition.onresult = (event: any) => {
-        const currentSegments: string[] = [...accumulatedPhrasesRef.current];
+        const currentSegments: string[] = [];
 
         for (let i = 0; i < event.results.length; i++) {
           const res = event.results[i];
@@ -110,11 +115,17 @@ export default function VoiceSOSModal({
           }
         }
 
-        const combined = combineSpeechResults(currentSegments);
-        if (combined) {
-          setTranscript(combined);
-          if (combined.length > 3) {
-            const parsed = parseSpokenRescueText(combined);
+        const activeTurn = combineSpeechResults(currentSegments);
+        currentTurnTextRef.current = activeTurn;
+
+        const fullCombined = accumulatedPastTextRef.current
+          ? `${accumulatedPastTextRef.current} ${activeTurn}`.trim()
+          : activeTurn;
+
+        if (fullCombined) {
+          setTranscript(fullCombined);
+          if (fullCombined.length > 3) {
+            const parsed = parseSpokenRescueText(fullCombined);
             setParsedResult(parsed);
           }
         }
@@ -132,7 +143,15 @@ export default function VoiceSOSModal({
       };
 
       recognition.onend = () => {
-        // If user is still recording, save current transcript and seamlessly restart next turn
+        // Finalize this turn into the persistent past accumulator
+        if (currentTurnTextRef.current.trim()) {
+          accumulatedPastTextRef.current = accumulatedPastTextRef.current
+            ? `${accumulatedPastTextRef.current} ${currentTurnTextRef.current.trim()}`.trim()
+            : currentTurnTextRef.current.trim();
+          currentTurnTextRef.current = "";
+        }
+
+        // If user is still recording, smoothly restart for the next continuous sentence
         if (isRecordingRef.current) {
           try {
             recognition.start();
@@ -159,6 +178,12 @@ export default function VoiceSOSModal({
   const stopListening = () => {
     isRecordingRef.current = false;
     setIsRecording(false);
+    if (currentTurnTextRef.current.trim()) {
+      accumulatedPastTextRef.current = accumulatedPastTextRef.current
+        ? `${accumulatedPastTextRef.current} ${currentTurnTextRef.current.trim()}`.trim()
+        : currentTurnTextRef.current.trim();
+      currentTurnTextRef.current = "";
+    }
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -305,6 +330,8 @@ export default function VoiceSOSModal({
                 type="button"
                 onClick={() => {
                   setTranscript("");
+                  accumulatedPastTextRef.current = "";
+                  currentTurnTextRef.current = "";
                   setParsedResult(null);
                 }}
                 className="text-[10px] text-neutral-400 hover:text-white"
@@ -319,6 +346,8 @@ export default function VoiceSOSModal({
             onChange={(e) => {
               const val = e.target.value;
               setTranscript(val);
+              accumulatedPastTextRef.current = val;
+              currentTurnTextRef.current = "";
               if (val.trim().length > 3) {
                 setParsedResult(parseSpokenRescueText(val));
               } else {
