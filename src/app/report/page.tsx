@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -16,14 +16,11 @@ import {
   Loader2,
   CheckCircle2,
   Crosshair,
-  Mic,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PhotoUpload from "@/components/PhotoUpload";
-import VoiceSOSModal from "@/components/VoiceSOSModal";
-import { ParsedVoiceReport } from "@/lib/voiceParser";
 import { ProblemType, PROBLEM_TYPE_LABELS, DogReport } from "@/lib/types";
-import { reverseGeocodeDetailed, getAccurateGPSPosition, getCachedCoordinates, forwardGeocode, watchLiveHardwareGPS } from "@/lib/geo";
+import { reverseGeocodeDetailed, getAccurateGPSPosition, getCachedCoordinates, forwardGeocode } from "@/lib/geo";
 import { getUserId, getUserName, addMyReportId, syncStatsToCloud } from "@/lib/user";
 import {
   isSafeImageUrl,
@@ -100,48 +97,13 @@ export default function ReportPage() {
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState<boolean>(false);
-  const isPinManuallyAdjusted = useRef<boolean>(false);
 
   // Auto-detect browser GPS and user handle on mount
   useEffect(() => {
     const savedName = localStorage.getItem("pawalert_user_name");
     if (savedName) setReporterName(savedName);
     detectLocation();
-
-    // Stream live hardware GPS updates as satellite lock refines
-    const unwatch = watchLiveHardwareGPS((loc) => {
-      if (!isPinManuallyAdjusted.current) {
-        setLatitude(loc.lat);
-        setLongitude(loc.lng);
-        setGpsAccuracy(loc.accuracy);
-      }
-    });
-
-    // Check if voice report was initiated from home screen
-    try {
-      const draftRaw = sessionStorage.getItem("pawalert_voice_draft");
-      if (draftRaw) {
-        const draft: ParsedVoiceReport = JSON.parse(draftRaw);
-        handleApplyVoiceReport(draft);
-        sessionStorage.removeItem("pawalert_voice_draft");
-      }
-    } catch (e) {}
-
-    return () => {
-      unwatch();
-    };
   }, []);
-
-  const handleApplyVoiceReport = (parsed: ParsedVoiceReport) => {
-    if (parsed.problemType) setSelectedCategory(parsed.problemType);
-    if (parsed.description) setDescription(parsed.description);
-    if (parsed.extractedLandmark) setLandmark(parsed.extractedLandmark);
-
-    if (!latitude || !longitude) {
-      detectLocation();
-    }
-  };
 
   const handlePhotoUploaded = (url: string) => {
     setPhotoUrl(url);
@@ -175,7 +137,6 @@ export default function ReportPage() {
   };
 
   const handleMapCoordinatePicked = async (lat: number, lng: number) => {
-    isPinManuallyAdjusted.current = true;
     setLatitude(lat);
     setLongitude(lng);
     setGpsAccuracy(1); // Manually verified exact pinpoint!
@@ -348,33 +309,6 @@ export default function ReportPage() {
             </p>
           </div>
 
-          {/* 🎙️ 1-Tap Voice-to-Rescue AI Banner */}
-          <div className="p-4 rounded-3xl bg-gradient-to-r from-pawAmber/20 via-neutral-900 to-amber-950/30 border border-pawAmber/40 flex items-center justify-between gap-3 shadow-xl">
-            <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 rounded-2xl bg-pawAmber/20 border border-pawAmber/30 flex items-center justify-center text-pawAmber shrink-0">
-                <Mic className="w-5 h-5 animate-pulse" />
-              </div>
-              <div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-xs font-black text-white">Voice SOS (Hands-Free AI)</span>
-                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-pawAmber text-black">Fast</span>
-                </div>
-                <p className="text-[11px] text-neutral-300">
-                  Speak in Hindi or English to auto-fill category, wound & landmark!
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setIsVoiceModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-pawAmber hover:bg-pawAmber-hover text-white text-xs font-black shadow-md shadow-pawAmber/20 transition-all active:scale-95 shrink-0 flex items-center space-x-1.5"
-            >
-              <Mic className="w-3.5 h-3.5" />
-              <span>Speak 🎙️</span>
-            </button>
-          </div>
-
           {errorMessage && (
             <div className="bg-red-950/40 border border-red-800/60 rounded-2xl p-4 text-xs sm:text-sm text-red-300 flex items-center space-x-2.5">
               <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
@@ -512,32 +446,13 @@ export default function ReportPage() {
 
                 {/* 📍 Interactive Draggable Pinpoint Map */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs flex-wrap gap-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-neutral-200 flex items-center space-x-1">
-                        <span>📍</span>
-                        <span>Pinpoint Exact Dog Spot</span>
-                      </span>
-                      {gpsAccuracy !== null && gpsAccuracy !== undefined && (
-                        <span
-                          className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                            gpsAccuracy === 1
-                              ? "bg-blue-950/40 text-blue-300 border-blue-800/40"
-                              : gpsAccuracy <= 15
-                              ? "bg-emerald-950/40 text-emerald-400 border-emerald-800/40"
-                              : "bg-amber-950/40 text-amber-400 border-amber-800/40"
-                          }`}
-                        >
-                          {gpsAccuracy === 1
-                            ? "🎯 Pin Placed Manually"
-                            : gpsAccuracy <= 15
-                            ? `🎯 ±${gpsAccuracy}m Satellite Lock`
-                            : `🛰️ ±${gpsAccuracy}m (Locking GPS...)`}
-                        </span>
-                      )}
-                    </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-neutral-200 flex items-center space-x-1">
+                      <span>📍</span>
+                      <span>Pinpoint Exact Dog Spot</span>
+                    </span>
                     <span className="text-[11px] text-pawAmber font-semibold">
-                      Tap satellite map or drag pin to adjust spot
+                      Tap map or drag pin to adjust
                     </span>
                   </div>
 
@@ -705,13 +620,6 @@ export default function ReportPage() {
           </form>
         </div>
       </main>
-
-      {/* 🎙️ Voice-to-Rescue AI Modal */}
-      <VoiceSOSModal
-        isOpen={isVoiceModalOpen}
-        onClose={() => setIsVoiceModalOpen(false)}
-        onApplyVoiceReport={handleApplyVoiceReport}
-      />
     </div>
   );
 }

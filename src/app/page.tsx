@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   LayoutGrid,
@@ -13,18 +12,15 @@ import {
   AlertCircle,
   Compass,
   ChevronDown,
-  Mic,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import DogCard from "@/components/DogCard";
 import NotificationBanner from "@/components/NotificationBanner";
 import InstallPwaPrompt from "@/components/InstallPwaPrompt";
 import CategoryFilter from "@/components/CategoryFilter";
-import VoiceSOSModal from "@/components/VoiceSOSModal";
-import { ParsedVoiceReport } from "@/lib/voiceParser";
 import { DogReport, ProblemType, ReportStatus } from "@/lib/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { calculateDistanceMeters, getDeviceGeolocation, getCachedCoordinates, watchLiveHardwareGPS } from "@/lib/geo";
+import { calculateDistanceMeters, getDeviceGeolocation, getCachedCoordinates } from "@/lib/geo";
 import { sendProximityAlert, getAlertRadiusKm } from "@/lib/notifications";
 
 // Global in-memory SWR cache for 0ms instant page loads
@@ -45,7 +41,6 @@ const MapView = dynamic(() => import("@/components/MapView"), {
 });
 
 export default function Home() {
-  const router = useRouter();
   const [reports, setReports] = useState<DogReport[]>(() => memoryReportsCache || []);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy?: number } | null>(() => getCachedCoordinates());
   const [isLocating, setIsLocating] = useState<boolean>(false);
@@ -57,14 +52,6 @@ export default function Home() {
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [page, setPage] = useState<number>(0);
   const [incomingAlert, setIncomingAlert] = useState<{ report: DogReport; distanceMeters: number | null } | null>(null);
-  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState<boolean>(false);
-
-  const handleApplyHomeVoiceReport = (parsed: ParsedVoiceReport) => {
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("pawalert_voice_draft", JSON.stringify(parsed));
-      router.push("/report");
-    }
-  };
 
   // Fetch live reports from Supabase with pagination & in-memory caching
   const fetchReports = useCallback(async (isRefresh: boolean = false) => {
@@ -163,11 +150,6 @@ export default function Home() {
     fetchReports();
     detectLocation();
 
-    // Stream live hardware GPS updates as satellite lock refines
-    const unwatch = watchLiveHardwareGPS((loc) => {
-      setUserLocation(loc);
-    });
-
     if (isSupabaseConfigured && supabase) {
       // Subscribe to real-time additions and updates
       const channel = supabase
@@ -222,14 +204,9 @@ export default function Home() {
         .subscribe();
 
       return () => {
-        unwatch();
         supabase?.removeChannel(channel);
       };
     }
-
-    return () => {
-      unwatch();
-    };
   }, [fetchReports]);
 
   // Filter and sort reports nearest first
@@ -478,26 +455,6 @@ export default function Home() {
 
       {/* PWA 1-Click Install Prompt */}
       <InstallPwaPrompt />
-
-      {/* 🎙️ Floating Quick Voice SOS Button */}
-      <div className="fixed bottom-6 right-6 z-40 flex items-center space-x-2">
-        <button
-          onClick={() => setIsVoiceModalOpen(true)}
-          className="group relative flex items-center space-x-2 px-4 py-3.5 rounded-full bg-gradient-to-r from-pawAmber to-amber-500 hover:from-pawAmber-hover hover:to-amber-400 text-white font-black text-xs sm:text-sm shadow-2xl shadow-pawAmber/50 transition-all hover:scale-105 active:scale-95"
-        >
-          <div className="w-2.5 h-2.5 rounded-full bg-red-400 animate-ping absolute -top-1 -right-1" />
-          <Mic className="w-5 h-5 text-white" />
-          <span className="hidden sm:inline">Voice SOS (Hindi / English)</span>
-          <span className="sm:hidden">Voice SOS 🎙️</span>
-        </button>
-      </div>
-
-      {/* 🎙️ Voice-to-Rescue AI Modal */}
-      <VoiceSOSModal
-        isOpen={isVoiceModalOpen}
-        onClose={() => setIsVoiceModalOpen(false)}
-        onApplyVoiceReport={handleApplyHomeVoiceReport}
-      />
     </div>
   );
 }
