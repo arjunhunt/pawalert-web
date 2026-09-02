@@ -49,10 +49,24 @@ export default function VoiceSOSModal({
     }
   }, []);
 
-  const startListening = () => {
+  const startListening = async () => {
     setErrorMessage("");
     setParsedResult(null);
     setTranscript("");
+
+    // 1. Explicitly prompt user for microphone permission via getUserMedia
+    if (typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Release the audio track immediately after permission is confirmed
+        stream.getTracks().forEach((track) => track.stop());
+      } catch (permissionErr: any) {
+        console.warn("Microphone permission error:", permissionErr);
+        setErrorMessage("Microphone permission was blocked. Please tap 'Allow' in your browser permissions bar.");
+        setIsRecording(false);
+        return;
+      }
+    }
 
     const SpeechRecognition =
       (window as any).SpeechRecognition ||
@@ -60,6 +74,7 @@ export default function VoiceSOSModal({
 
     if (!SpeechRecognition) {
       setErrorMessage("Voice recognition is not supported in this browser. Please use Google Chrome, Safari, or Edge.");
+      setIsRecording(false);
       return;
     }
 
@@ -71,6 +86,7 @@ export default function VoiceSOSModal({
 
       recognition.onstart = () => {
         setIsRecording(true);
+        setErrorMessage("");
       };
 
       recognition.onresult = (event: any) => {
@@ -90,9 +106,9 @@ export default function VoiceSOSModal({
       recognition.onerror = (event: any) => {
         console.warn("Speech error:", event.error);
         if (event.error === "not-allowed") {
-          setErrorMessage("Microphone permission denied. Please allow microphone access in your browser.");
+          setErrorMessage("Microphone permission was not allowed. Please allow microphone in browser settings.");
         } else if (event.error !== "no-speech") {
-          setErrorMessage(`Audio capture error: ${event.error}`);
+          setErrorMessage(`Speech recognition error: ${event.error}`);
         }
         setIsRecording(false);
       };
@@ -103,9 +119,9 @@ export default function VoiceSOSModal({
 
       recognitionRef.current = recognition;
       recognition.start();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to start speech recognition", e);
-      setErrorMessage("Could not start microphone. Please check permissions.");
+      setErrorMessage("Could not start microphone. Please check browser permissions.");
       setIsRecording(false);
     }
   };
@@ -134,17 +150,15 @@ export default function VoiceSOSModal({
     }
   };
 
-  // Auto-start on opening if supported
+  // Cleanup on unmount or when modal closes
   useEffect(() => {
-    if (isOpen && isSupported) {
-      startListening();
-    } else {
+    if (!isOpen) {
       stopListening();
     }
     return () => {
       stopListening();
     };
-  }, [isOpen, language]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -249,18 +263,40 @@ export default function VoiceSOSModal({
           </div>
         )}
 
-        {/* Live Streaming Transcription Box */}
-        <div className="p-4 rounded-2xl bg-darkBg border border-darkBorder text-left space-y-2 min-h-[90px] max-h-[120px] overflow-y-auto">
-          <span className="text-[10px] font-extrabold uppercase text-neutral-500 tracking-wider">
-            Live Speech Transcribed:
-          </span>
-          <p className="text-xs sm:text-sm text-neutral-200 font-medium leading-relaxed italic">
-            {transcript || (
-              <span className="text-neutral-500 not-italic">
-                "Example: Station road pe chai stall ke pass ek brown puppy hai, pair se bleeding ho rahi hai..."
-              </span>
+        {/* Live Streaming Transcription / Editable Box */}
+        <div className="p-3.5 rounded-2xl bg-darkBg border border-darkBorder text-left space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase text-neutral-500 tracking-wider">
+              {isRecording ? "🔴 Transcribing Live Speech..." : "Spoken Text (Editable):"}
+            </span>
+            {transcript && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTranscript("");
+                  setParsedResult(null);
+                }}
+                className="text-[10px] text-neutral-400 hover:text-white"
+              >
+                Clear
+              </button>
             )}
-          </p>
+          </div>
+          <textarea
+            rows={2}
+            value={transcript}
+            onChange={(e) => {
+              const val = e.target.value;
+              setTranscript(val);
+              if (val.trim().length > 3) {
+                setParsedResult(parseSpokenRescueText(val));
+              } else {
+                setParsedResult(null);
+              }
+            }}
+            placeholder='Tap the mic above and speak, or type: "Station road pe chai stall ke pass ek brown puppy hai bleeding ho rahi hai..."'
+            className="w-full bg-transparent text-xs sm:text-sm text-white placeholder-neutral-500 focus:outline-none resize-none leading-relaxed"
+          />
         </div>
 
         {/* AI Extracted Intelligence Preview Card */}
