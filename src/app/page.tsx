@@ -24,7 +24,7 @@ import VoiceSOSModal from "@/components/VoiceSOSModal";
 import { ParsedVoiceReport } from "@/lib/voiceParser";
 import { DogReport, ProblemType, ReportStatus } from "@/lib/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { calculateDistanceMeters, getDeviceGeolocation, getCachedCoordinates } from "@/lib/geo";
+import { calculateDistanceMeters, getDeviceGeolocation, getCachedCoordinates, watchLiveHardwareGPS } from "@/lib/geo";
 import { sendProximityAlert, getAlertRadiusKm } from "@/lib/notifications";
 
 // Global in-memory SWR cache for 0ms instant page loads
@@ -163,6 +163,11 @@ export default function Home() {
     fetchReports();
     detectLocation();
 
+    // Stream live hardware GPS updates as satellite lock refines
+    const unwatch = watchLiveHardwareGPS((loc) => {
+      setUserLocation(loc);
+    });
+
     if (isSupabaseConfigured && supabase) {
       // Subscribe to real-time additions and updates
       const channel = supabase
@@ -217,9 +222,14 @@ export default function Home() {
         .subscribe();
 
       return () => {
+        unwatch();
         supabase?.removeChannel(channel);
       };
     }
+
+    return () => {
+      unwatch();
+    };
   }, [fetchReports]);
 
   // Filter and sort reports nearest first

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -23,7 +23,7 @@ import PhotoUpload from "@/components/PhotoUpload";
 import VoiceSOSModal from "@/components/VoiceSOSModal";
 import { ParsedVoiceReport } from "@/lib/voiceParser";
 import { ProblemType, PROBLEM_TYPE_LABELS, DogReport } from "@/lib/types";
-import { reverseGeocodeDetailed, getAccurateGPSPosition, getCachedCoordinates, forwardGeocode } from "@/lib/geo";
+import { reverseGeocodeDetailed, getAccurateGPSPosition, getCachedCoordinates, forwardGeocode, watchLiveHardwareGPS } from "@/lib/geo";
 import { getUserId, getUserName, addMyReportId, syncStatsToCloud } from "@/lib/user";
 import {
   isSafeImageUrl,
@@ -101,12 +101,22 @@ export default function ReportPage() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState<boolean>(false);
+  const isPinManuallyAdjusted = useRef<boolean>(false);
 
   // Auto-detect browser GPS and user handle on mount
   useEffect(() => {
     const savedName = localStorage.getItem("pawalert_user_name");
     if (savedName) setReporterName(savedName);
     detectLocation();
+
+    // Stream live hardware GPS updates as satellite lock refines
+    const unwatch = watchLiveHardwareGPS((loc) => {
+      if (!isPinManuallyAdjusted.current) {
+        setLatitude(loc.lat);
+        setLongitude(loc.lng);
+        setGpsAccuracy(loc.accuracy);
+      }
+    });
 
     // Check if voice report was initiated from home screen
     try {
@@ -117,6 +127,10 @@ export default function ReportPage() {
         sessionStorage.removeItem("pawalert_voice_draft");
       }
     } catch (e) {}
+
+    return () => {
+      unwatch();
+    };
   }, []);
 
   const handleApplyVoiceReport = (parsed: ParsedVoiceReport) => {
@@ -161,6 +175,7 @@ export default function ReportPage() {
   };
 
   const handleMapCoordinatePicked = async (lat: number, lng: number) => {
+    isPinManuallyAdjusted.current = true;
     setLatitude(lat);
     setLongitude(lng);
     setGpsAccuracy(1); // Manually verified exact pinpoint!
@@ -497,13 +512,32 @@ export default function ReportPage() {
 
                 {/* 📍 Interactive Draggable Pinpoint Map */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-neutral-200 flex items-center space-x-1">
-                      <span>📍</span>
-                      <span>Pinpoint Exact Dog Spot</span>
-                    </span>
+                  <div className="flex items-center justify-between text-xs flex-wrap gap-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-neutral-200 flex items-center space-x-1">
+                        <span>📍</span>
+                        <span>Pinpoint Exact Dog Spot</span>
+                      </span>
+                      {gpsAccuracy !== null && gpsAccuracy !== undefined && (
+                        <span
+                          className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                            gpsAccuracy === 1
+                              ? "bg-blue-950/40 text-blue-300 border-blue-800/40"
+                              : gpsAccuracy <= 15
+                              ? "bg-emerald-950/40 text-emerald-400 border-emerald-800/40"
+                              : "bg-amber-950/40 text-amber-400 border-amber-800/40"
+                          }`}
+                        >
+                          {gpsAccuracy === 1
+                            ? "🎯 Pin Placed Manually"
+                            : gpsAccuracy <= 15
+                            ? `🎯 ±${gpsAccuracy}m Satellite Lock`
+                            : `🛰️ ±${gpsAccuracy}m (Locking GPS...)`}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[11px] text-pawAmber font-semibold">
-                      Tap map or drag pin to adjust
+                      Tap satellite map or drag pin to adjust spot
                     </span>
                   </div>
 
