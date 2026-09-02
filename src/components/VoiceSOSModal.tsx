@@ -3,24 +3,16 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Mic,
-  MicOff,
   Sparkles,
   AlertTriangle,
-  CheckCircle2,
-  MapPin,
   X,
-  Volume2,
-  RefreshCw,
   ArrowRight,
-  Flame,
 } from "lucide-react";
 import {
   parseSpokenRescueText,
   combineSpeechResults,
-  cleanSpokenTranscript,
   ParsedVoiceReport,
 } from "@/lib/voiceParser";
-import { PROBLEM_TYPE_LABELS } from "@/lib/types";
 
 interface VoiceSOSModalProps {
   isOpen: boolean;
@@ -200,8 +192,13 @@ export default function VoiceSOSModal({
   };
 
   const handleApply = () => {
-    if (parsedResult) {
-      onApplyVoiceReport(parsedResult);
+    const textToUse = transcript.trim();
+    if (textToUse) {
+      const parsed = parsedResult || parseSpokenRescueText(textToUse);
+      onApplyVoiceReport({
+        ...parsed,
+        description: textToUse,
+      });
       onClose();
     }
   };
@@ -217,10 +214,6 @@ export default function VoiceSOSModal({
   }, [isOpen]);
 
   if (!isOpen) return null;
-
-  const categoryInfo = parsedResult
-    ? PROBLEM_TYPE_LABELS[parsedResult.problemType]
-    : null;
 
   return (
     <div
@@ -359,50 +352,16 @@ export default function VoiceSOSModal({
           />
         </div>
 
-        {/* AI Extracted Intelligence Preview Card */}
-        {parsedResult && parsedResult.rawText.length > 3 && (
-          <div className="p-4 rounded-2xl bg-gradient-to-b from-neutral-900 to-darkBg border border-pawAmber/40 text-left space-y-3 shadow-lg animate-in fade-in">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-black uppercase text-pawAmber tracking-wider flex items-center space-x-1">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>AI Detected Rescue Plan</span>
-              </span>
-
-              {parsedResult.urgency === "CRITICAL" && (
-                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-600 text-white animate-pulse flex items-center space-x-1">
-                  <Flame className="w-3 h-3" />
-                  <span>Critical Urgency</span>
-                </span>
-              )}
-            </div>
-
-            {/* Extracted Badges */}
-            <div className="flex items-center flex-wrap gap-2">
-              {categoryInfo && (
-                <span className="text-xs font-extrabold px-3 py-1 rounded-xl border border-pawAmber/40 bg-neutral-800 text-white flex items-center space-x-1">
-                  <span>{categoryInfo.icon}</span>
-                  <span>{categoryInfo.label}</span>
-                </span>
-              )}
-
-              {parsedResult.extractedLandmark && (
-                <span className="text-xs font-bold px-3 py-1 rounded-xl bg-amber-950/40 text-amber-300 border border-amber-800/40 flex items-center space-x-1">
-                  <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{parsedResult.extractedLandmark}</span>
-                </span>
-              )}
-            </div>
-
-            {/* Action Button */}
-            <button
-              type="button"
-              onClick={handleApply}
-              className="w-full py-3 rounded-2xl bg-pawAmber hover:bg-pawAmber-hover text-white font-extrabold text-xs sm:text-sm transition-all shadow-md shadow-pawAmber/20 flex items-center justify-center space-x-2 active:scale-95"
-            >
-              <span>Auto-Fill & Review Report Form</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+        {/* Action Button: Auto-Fill & Review Report Form */}
+        {transcript.trim().length > 0 && (
+          <button
+            type="button"
+            onClick={handleApply}
+            className="w-full py-3.5 rounded-2xl bg-pawAmber hover:bg-pawAmber-hover text-white font-extrabold text-xs sm:text-sm transition-all shadow-xl shadow-pawAmber/20 flex items-center justify-center space-x-2 active:scale-95 animate-in fade-in"
+          >
+            <span>Auto-Fill & Review Report Form</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         )}
       </div>
     </div>
