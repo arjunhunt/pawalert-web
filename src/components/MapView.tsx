@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
 import { escapeHtml } from "@/lib/security";
@@ -10,6 +10,7 @@ interface MapViewProps {
   userLocation?: { lat: number; lng: number; accuracy?: number } | null;
   onSelectCoordinate?: (lat: number, lng: number) => void;
   interactiveSelect?: boolean;
+  defaultMapType?: "satellite" | "street";
 }
 
 export default function MapView({
@@ -17,10 +18,66 @@ export default function MapView({
   userLocation,
   onSelectCoordinate,
   interactiveSelect = false,
+  defaultMapType = "satellite",
 }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
+  const leafletModuleRef = useRef<any>(null);
+  const tileLayersRef = useRef<any[]>([]);
   const lastCenteredLocationRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  const [mapType, setMapType] = useState<"satellite" | "street">(defaultMapType);
+
+  const applyTileLayer = (L: any, map: any, type: "satellite" | "street") => {
+    tileLayersRef.current.forEach((layer) => {
+      try {
+        map.removeLayer(layer);
+      } catch (e) {}
+    });
+    tileLayersRef.current = [];
+
+    if (type === "satellite") {
+      // ESRI High-Resolution World Imagery
+      const satLayer = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        {
+          attribution:
+            '&copy; <a href="https://www.esri.com">Esri</a>, Earthstar Geographics',
+          maxZoom: 19,
+        }
+      ).addTo(map);
+
+      // Hybrid Street Names & Boundaries Overlay
+      const labelsLayer = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+        {
+          attribution: "",
+          maxZoom: 19,
+        }
+      ).addTo(map);
+
+      tileLayersRef.current = [satLayer, labelsLayer];
+    } else {
+      // Standard OpenStreetMap Tile Layer
+      const streetLayer = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+        }
+      ).addTo(map);
+
+      tileLayersRef.current = [streetLayer];
+    }
+  };
+
+  // Switch tile layers dynamically when user toggles
+  useEffect(() => {
+    if (mapInstanceRef.current && leafletModuleRef.current) {
+      applyTileLayer(leafletModuleRef.current, mapInstanceRef.current, mapType);
+    }
+  }, [mapType]);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -31,6 +88,7 @@ export default function MapView({
     // Dynamically load Leaflet on the client
     import("leaflet").then((L) => {
       if (!isMounted || !mapContainerRef.current) return;
+      leafletModuleRef.current = L;
 
       // Center around user location or first report or default to India coordinates
       const centerLat = userLocation?.lat || reports[0]?.latitude || 20.1759;
@@ -51,18 +109,11 @@ export default function MapView({
           const map = L.map(mapContainerRef.current, {
             zoomControl: true,
             scrollWheelZoom: !interactiveSelect,
-          }).setView([centerLat, centerLng], 15);
+          }).setView([centerLat, centerLng], 16);
           mapInstanceRef.current = map;
 
-          // OpenStreetMap Tile Layer (100% Free, High Precision, No Watermarks)
-          L.tileLayer(
-            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-            {
-              attribution:
-                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-              maxZoom: 19,
-            }
-          ).addTo(map);
+          // Apply default satellite imagery
+          applyTileLayer(L, map, mapType);
 
           // Allow clicking on the map to pick coordinates when creating a report
           if (interactiveSelect && onSelectCoordinate) {
@@ -76,6 +127,7 @@ export default function MapView({
       }
 
       const map = mapInstanceRef.current;
+      if (!map) return;
 
       // Clear existing markers & circles
       map.eachLayer((layer: any) => {
@@ -93,7 +145,7 @@ export default function MapView({
           radius: Math.min(Math.max(accuracyMeters, 10), 120),
           color: "#3b82f6",
           fillColor: "#3b82f6",
-          fillOpacity: 0.12,
+          fillOpacity: 0.16,
           weight: 1.5,
           dashArray: "4, 4",
         }).addTo(map);
@@ -124,7 +176,7 @@ export default function MapView({
           }
 
           if (shouldCenter) {
-            map.flyTo([userLocation.lat, userLocation.lng], 15, { duration: 0.8 });
+            map.flyTo([userLocation.lat, userLocation.lng], 16, { duration: 0.8 });
             lastCenteredLocationRef.current = { lat: userLocation.lat, lng: userLocation.lng };
           }
         }
@@ -233,6 +285,34 @@ export default function MapView({
   return (
     <div className="w-full h-full relative rounded-2xl overflow-hidden border border-darkBorder bg-darkCard">
       <div ref={mapContainerRef} className="w-full h-full min-h-[400px]" />
+
+      {/* 🛰️ Satellite vs 🗺️ Street Map Toggle Switch */}
+      <div className="absolute top-3 right-3 z-[1000] bg-black/80 backdrop-blur-md border border-neutral-700/80 rounded-2xl p-1 flex items-center space-x-1 shadow-2xl">
+        <button
+          type="button"
+          onClick={() => setMapType("satellite")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1 ${
+            mapType === "satellite"
+              ? "bg-pawAmber text-white shadow-md shadow-pawAmber/30 scale-100"
+              : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          <span>🛰️</span>
+          <span>Satellite</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMapType("street")}
+          className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1 ${
+            mapType === "street"
+              ? "bg-pawAmber text-white shadow-md shadow-pawAmber/30 scale-100"
+              : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          <span>🗺️</span>
+          <span>Street</span>
+        </button>
+      </div>
     </div>
   );
 }
