@@ -548,35 +548,6 @@ export default function ReportPage() {
                   </div>
                 </div>
 
-                {/* Quick Spot Clue Chips */}
-                <div className="space-y-1.5 pt-1">
-                  <label className="block text-[11px] font-bold text-neutral-400">
-                    ⚡ Quick Visual Clues (helps volunteer spot dog in 5 seconds):
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      "🌳 Under Tree",
-                      "🏪 Near Shop / Chai Stall",
-                      "🚗 Near Parked Car/Auto",
-                      "🏢 Society / Building Gate",
-                      "🛣️ Footpath / Divider",
-                      "🐾 Colony Alley / Corner",
-                    ].map((clue) => (
-                      <button
-                        key={clue}
-                        type="button"
-                        onClick={() => {
-                          if (!landmark) setLandmark(clue);
-                          else if (!landmark.includes(clue)) setLandmark(`${landmark}, ${clue}`);
-                        }}
-                        className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-neutral-800/90 hover:bg-neutral-700 border border-darkBorder text-neutral-300 transition-all active:scale-95"
-                      >
-                        + {clue}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Pincode */}
                 <div>
                   <label className="block text-xs font-semibold text-neutral-300 mb-1">
