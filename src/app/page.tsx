@@ -382,6 +382,9 @@ export default function Home() {
             <MapView
               reports={filteredReports.map((r) => r.report)}
               userLocation={userLocation}
+              onLocationDetected={(lat, lng, accuracy) => {
+                setUserLocation({ lat, lng, accuracy });
+              }}
             />
           </div>
         ) : filteredReports.length === 0 ? (
