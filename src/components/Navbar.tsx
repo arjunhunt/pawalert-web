@@ -26,9 +26,14 @@ export default function Navbar({
             <Dog className="w-6 h-6 text-pawAmber" />
           </div>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-pawAmber">
-              PawAlert
-            </h1>
+            <div className="flex items-center space-x-1.5">
+              <h1 className="text-xl font-black tracking-tight text-pawAmber">
+                PawAlert
+              </h1>
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-600/30 text-blue-400 border border-blue-500/40">
+                Trial Mode
+              </span>
+            </div>
             <p className="text-xs text-neutral-400 font-medium -mt-1 hidden sm:block">
               Community Stray Dog Network
             </p>
