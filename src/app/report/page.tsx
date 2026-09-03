@@ -486,6 +486,9 @@ export default function ReportPage() {
                       }
                       interactiveSelect={true}
                       onSelectCoordinate={handleMapCoordinatePicked}
+                      onLocationDetected={(lat, lng) => {
+                        handleMapCoordinatePicked(lat, lng);
+                      }}
                     />
 
                     {isAdjustingPin && (

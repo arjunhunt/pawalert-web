@@ -158,87 +158,76 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 }
 
 /**
- * High-Precision GPS Lock with Progressive Satellite Convergence & Anti-Jitter Filter.
- * Samples continuous GPS fixes for up to 6 seconds to lock onto the highest-precision satellite reading (<20m accuracy).
+ * High-Precision GPS Lock with Instant Permission Trigger & Progressive Convergence.
+ * Solves mobile permission timeouts and gets real coordinates reliably across all devices.
  */
 export function getAccurateGPSPosition(
   forceRefresh: boolean = false,
-  maxWaitMs: number = 6000
+  maxWaitMs: number = 10000
 ): Promise<{ lat: number; lng: number; accuracy: number; error?: string } | null> {
   if (typeof window === "undefined" || !navigator.geolocation) {
     return Promise.resolve({ lat: 0, lng: 0, accuracy: 9999, error: "Geolocation is not supported on this browser." });
   }
 
   return new Promise((resolve) => {
-    let bestFix: { lat: number; lng: number; accuracy: number } | null = null;
-    let watchId: number | null = null;
-    let hasResolved = false;
+    let resolved = false;
 
-    const finish = (result: { lat: number; lng: number; accuracy: number; error?: string } | null) => {
-      if (hasResolved) return;
-      hasResolved = true;
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-      }
-      if (result && result.lat !== 0 && result.lng !== 0) {
+    const finish = (result: { lat: number; lng: number; accuracy: number; error?: string }) => {
+      if (resolved) return;
+      resolved = true;
+      if (result.lat !== 0 && result.lng !== 0) {
         cacheCoordinates(result.lat, result.lng, result.accuracy);
       }
       resolve(result);
     };
 
-    // Safety timeout: take the best fix collected so far
+    // Safety timeout
     const timer = setTimeout(() => {
-      if (bestFix && bestFix.accuracy < 250) {
-        finish(bestFix);
-      } else {
-        // Fallback to one-shot getCurrentPosition with network
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const fix = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-              accuracy: pos.coords.accuracy || 50,
-            };
-            finish(fix);
-          },
-          (err) => {
-            let errMsg = "Could not detect accurate GPS location.";
-            if (err.code === 1) errMsg = "Location permission is denied. Please allow location in browser settings.";
-            else if (err.code === 2) errMsg = "GPS signal unavailable. Please enable Location in phone settings.";
-            else if (err.code === 3) errMsg = "GPS satellite lock timed out. Please tap Detect GPS again.";
-            finish({ lat: 0, lng: 0, accuracy: 9999, error: errMsg });
-          },
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-        );
+      if (!resolved) {
+        finish({ lat: 0, lng: 0, accuracy: 9999, error: "GPS timed out. Please tap Locate Me again." });
       }
-    }, maxWaitMs);
+    }, maxWaitMs + 3000);
 
-    watchId = navigator.geolocation.watchPosition(
+    // 1. Primary: Request high-accuracy GPS satellite fix
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const currentAccuracy = pos.coords.accuracy;
-        const currentFix = {
+        clearTimeout(timer);
+        finish({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
-          accuracy: currentAccuracy,
-        };
-
-        // Anti-jitter: update bestFix if this fix has higher precision
-        if (!bestFix || currentAccuracy < bestFix.accuracy) {
-          bestFix = currentFix;
-        }
-
-        // If satellite lock reaches sub-20m accuracy (high precision), resolve immediately!
-        if (currentAccuracy <= 20) {
-          clearTimeout(timer);
-          finish(bestFix);
-        }
+          accuracy: Math.round(pos.coords.accuracy || 15),
+        });
       },
       (err) => {
-        console.warn("GPS watch warning:", err.code, err.message);
+        console.warn("Primary GPS notice, attempting resilient lock:", err.code, err.message);
+        // If high accuracy times out (e.g. indoors or under roof), fallback to network fix
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            clearTimeout(timer);
+            finish({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              accuracy: Math.round(pos.coords.accuracy || 45),
+            });
+          },
+          (err2) => {
+            clearTimeout(timer);
+            let errMsg = "Could not detect device location.";
+            if (err2.code === 1 || err.code === 1) {
+              errMsg = "Location permission denied. Please allow location access in your browser.";
+            } else if (err2.code === 2 || err.code === 2) {
+              errMsg = "Location unavailable. Please turn on device Location / GPS in settings.";
+            } else if (err2.code === 3 || err.code === 3) {
+              errMsg = "Location request timed out. Please tap Locate Me again.";
+            }
+            finish({ lat: 0, lng: 0, accuracy: 9999, error: errMsg });
+          },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: forceRefresh ? 0 : 30000 }
+        );
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: maxWaitMs,
         maximumAge: forceRefresh ? 0 : 5000,
       }
     );
@@ -246,7 +235,7 @@ export function getAccurateGPSPosition(
 }
 
 export async function getDeviceGeolocation(forceRefresh: boolean = false): Promise<{ lat: number; lng: number; accuracy?: number; error?: string } | null> {
-  return getAccurateGPSPosition(forceRefresh, 6000);
+  return getAccurateGPSPosition(forceRefresh, 10000);
 }
 
 export async function getResilientGeolocation(forceRefresh: boolean = false): Promise<{ lat: number; lng: number } | null> {

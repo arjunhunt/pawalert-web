@@ -11,6 +11,7 @@ interface MapViewProps {
   reports: DogReport[];
   userLocation?: { lat: number; lng: number; accuracy?: number } | null;
   onSelectCoordinate?: (lat: number, lng: number) => void;
+  onLocationDetected?: (lat: number, lng: number, accuracy?: number) => void;
   interactiveSelect?: boolean;
   defaultMapType?: "satellite" | "street";
 }
@@ -19,6 +20,7 @@ export default function MapView({
   reports,
   userLocation,
   onSelectCoordinate,
+  onLocationDetected,
   interactiveSelect = false,
   defaultMapType = "satellite",
 }: MapViewProps) {
@@ -90,10 +92,13 @@ export default function MapView({
       const res = await getDeviceGeolocation(true);
       if (res && res.lat !== 0 && res.lng !== 0) {
         const zoomLevel = interactiveSelect ? 18 : 17;
-        mapInstanceRef.current.flyTo([res.lat, res.lng], zoomLevel, { duration: 1 });
+        mapInstanceRef.current.flyTo([res.lat, res.lng], zoomLevel, { duration: 1.2 });
         lastCenteredLocationRef.current = { lat: res.lat, lng: res.lng };
         if (interactiveSelect && onSelectCoordinate) {
           onSelectCoordinate(res.lat, res.lng);
+        }
+        if (onLocationDetected) {
+          onLocationDetected(res.lat, res.lng, res.accuracy);
         }
       }
     } catch (e) {
@@ -114,17 +119,23 @@ export default function MapView({
       if (!isMounted || !mapContainerRef.current) return;
       leafletModuleRef.current = L;
 
-      // Center around user location or first report or default to India coordinates
-      const centerLat = userLocation?.lat || reports[0]?.latitude || 20.1759;
-      const centerLng = userLocation?.lng || reports[0]?.longitude || 72.7549;
-      const initialZoom = interactiveSelect ? 18 : 16;
+      // Determine initial center coordinates dynamically based on user
+      let centerLat = 21.7679;
+      let centerLng = 78.8718;
+      let initialZoom = 5; // Broad overview until GPS arrives
 
-      // If map is already initialized on this container, reuse or update it
-      if (mapInstanceRef.current) {
-        try {
-          mapInstanceRef.current.setView([centerLat, centerLng], mapInstanceRef.current.getZoom());
-        } catch (e) {}
-      } else {
+      if (userLocation && userLocation.lat !== 0 && userLocation.lng !== 0) {
+        centerLat = userLocation.lat;
+        centerLng = userLocation.lng;
+        initialZoom = interactiveSelect ? 18 : 16;
+      } else if (reports.length > 0 && reports[0].latitude && reports[0].longitude) {
+        centerLat = reports[0].latitude;
+        centerLng = reports[0].longitude;
+        initialZoom = interactiveSelect ? 18 : 14;
+      }
+
+      // If map is already initialized on this container, DO NOT force setView to fallback!
+      if (!mapInstanceRef.current) {
         // Clean any residual leaflet id on container
         if ((mapContainerRef.current as any)._leaflet_id) {
           (mapContainerRef.current as any)._leaflet_id = null;
@@ -201,7 +212,7 @@ export default function MapView({
 
         if (shouldCenter) {
           const targetZoom = interactiveSelect ? 18 : 16;
-          map.flyTo([userLocation.lat, userLocation.lng], targetZoom, { duration: 0.8 });
+          map.flyTo([userLocation.lat, userLocation.lng], targetZoom, { duration: 1.2 });
           lastCenteredLocationRef.current = { lat: userLocation.lat, lng: userLocation.lng };
         }
       }
