@@ -12,6 +12,7 @@ interface MapViewProps {
   userLocation?: { lat: number; lng: number; accuracy?: number } | null;
   onSelectCoordinate?: (lat: number, lng: number) => void;
   interactiveSelect?: boolean;
+  defaultMapType?: "satellite" | "street";
 }
 
 export default function MapView({
@@ -19,11 +20,68 @@ export default function MapView({
   userLocation,
   onSelectCoordinate,
   interactiveSelect = false,
+  defaultMapType = "satellite",
 }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
+  const leafletModuleRef = useRef<any>(null);
+  const tileLayersRef = useRef<any[]>([]);
   const lastCenteredLocationRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  const [mapType, setMapType] = useState<"satellite" | "street">(defaultMapType);
   const [isLocatingMap, setIsLocatingMap] = useState<boolean>(false);
+
+  const applyTileLayer = (L: any, map: any, type: "satellite" | "street") => {
+    // Remove previous tile layers cleanly
+    tileLayersRef.current.forEach((layer) => {
+      try {
+        map.removeLayer(layer);
+      } catch (e) {}
+    });
+    tileLayersRef.current = [];
+
+    if (type === "satellite") {
+      // ESRI High-Resolution World Imagery
+      const satLayer = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        {
+          attribution:
+            '&copy; <a href="https://www.esri.com">Esri</a>, Earthstar Geographics',
+          maxZoom: 19,
+        }
+      ).addTo(map);
+
+      // Hybrid Street Names, Roads & Landmark Reference Labels
+      const labelsLayer = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+        {
+          attribution: "",
+          maxZoom: 19,
+        }
+      ).addTo(map);
+
+      tileLayersRef.current = [satLayer, labelsLayer];
+    } else {
+      // Standard OpenStreetMap Tile Layer
+      const streetLayer = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+        }
+      ).addTo(map);
+
+      tileLayersRef.current = [streetLayer];
+    }
+  };
+
+  // Switch tile layers dynamically when user toggles
+  useEffect(() => {
+    if (mapInstanceRef.current && leafletModuleRef.current) {
+      applyTileLayer(leafletModuleRef.current, mapInstanceRef.current, mapType);
+    }
+  }, [mapType]);
 
   const handleLocateMe = async () => {
     if (!mapInstanceRef.current) return;
@@ -31,7 +89,7 @@ export default function MapView({
     try {
       const res = await getDeviceGeolocation(true);
       if (res && res.lat !== 0 && res.lng !== 0) {
-        const zoomLevel = interactiveSelect ? 17 : 16;
+        const zoomLevel = interactiveSelect ? 18 : 17;
         mapInstanceRef.current.flyTo([res.lat, res.lng], zoomLevel, { duration: 1 });
         lastCenteredLocationRef.current = { lat: res.lat, lng: res.lng };
         if (interactiveSelect && onSelectCoordinate) {
@@ -54,10 +112,12 @@ export default function MapView({
     // Dynamically load Leaflet on the client
     import("leaflet").then((L) => {
       if (!isMounted || !mapContainerRef.current) return;
+      leafletModuleRef.current = L;
 
       // Center around user location or first report or default to India coordinates
       const centerLat = userLocation?.lat || reports[0]?.latitude || 20.1759;
       const centerLng = userLocation?.lng || reports[0]?.longitude || 72.7549;
+      const initialZoom = interactiveSelect ? 18 : 16;
 
       // If map is already initialized on this container, reuse or update it
       if (mapInstanceRef.current) {
@@ -74,18 +134,11 @@ export default function MapView({
           const map = L.map(mapContainerRef.current, {
             zoomControl: true,
             scrollWheelZoom: !interactiveSelect,
-          }).setView([centerLat, centerLng], 15);
+          }).setView([centerLat, centerLng], initialZoom);
           mapInstanceRef.current = map;
 
-          // OpenStreetMap Tile Layer (100% Free, High Precision, No Watermarks)
-          L.tileLayer(
-            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-            {
-              attribution:
-                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-              maxZoom: 19,
-            }
-          ).addTo(map);
+          // Apply initial satellite/street tile layers
+          applyTileLayer(L, map, mapType);
 
           // Allow clicking on the map to pick coordinates when creating a report
           if (interactiveSelect && onSelectCoordinate) {
@@ -99,6 +152,7 @@ export default function MapView({
       }
 
       const map = mapInstanceRef.current;
+      if (!map) return;
 
       // Clear existing markers & circles
       map.eachLayer((layer: any) => {
@@ -107,7 +161,7 @@ export default function MapView({
         }
       });
 
-      // User Location Marker, High-Precision Accuracy Halo & Anti-Jitter Viewport Centering
+      // User Location Marker, High-Precision Accuracy Halo & Viewport Centering
       if (userLocation && userLocation.lat !== 0 && userLocation.lng !== 0) {
         const accuracyMeters = userLocation.accuracy ? Math.round(userLocation.accuracy) : 15;
 
@@ -116,7 +170,7 @@ export default function MapView({
           radius: Math.min(Math.max(accuracyMeters, 10), 120),
           color: "#3b82f6",
           fillColor: "#3b82f6",
-          fillOpacity: 0.12,
+          fillOpacity: 0.14,
           weight: 1.5,
           dashArray: "4, 4",
         }).addTo(map);
@@ -146,7 +200,7 @@ export default function MapView({
         }
 
         if (shouldCenter) {
-          const targetZoom = interactiveSelect ? 17 : 16;
+          const targetZoom = interactiveSelect ? 18 : 16;
           map.flyTo([userLocation.lat, userLocation.lng], targetZoom, { duration: 0.8 });
           lastCenteredLocationRef.current = { lat: userLocation.lat, lng: userLocation.lng };
         }
@@ -183,8 +237,7 @@ export default function MapView({
               justify-content: center;
               border: 3px solid white;
               box-shadow: 0 4px 14px rgba(0,0,0,0.6);
-              cursor: ${interactiveSelect ? "grab" : "pointer"};
-              ${interactiveSelect ? "animation: pulse 1.8s infinite;" : ""}
+              cursor: pointer;
             ">
               <span style="transform: rotate(45deg); font-size: 18px;">${catInfo.icon}</span>
             </div>
@@ -207,7 +260,7 @@ export default function MapView({
             </div>
             ${
               interactiveSelect
-                ? `<div style="font-size: 11px; color: #EF6C00; font-weight: bold;">📍 Drag pin or tap map to adjust spot</div>`
+                ? `<div style="font-size: 11px; color: #777; font-style: italic;">Tap map or drag pin to adjust exact location</div>`
                 : `<a href="/alert/${encodeURIComponent(report.id)}" style="
                     display: block;
                     text-align: center;
@@ -256,21 +309,50 @@ export default function MapView({
     <div className="w-full h-full relative rounded-2xl overflow-hidden border border-darkBorder bg-darkCard select-none">
       <div ref={mapContainerRef} className="w-full h-full min-h-[400px]" />
 
-      {/* Floating GPS Recenter Button */}
-      <div className="absolute top-3 right-3 z-[1000]">
+      {/* Floating Controls: Layer Switcher & Locate Me Button */}
+      <div className="absolute top-3 right-3 z-[1000] flex items-center space-x-1.5">
+        {/* Satellite vs Street Toggle */}
+        <div className="bg-black/85 backdrop-blur-md border border-neutral-700/80 rounded-xl p-0.5 flex items-center space-x-0.5 shadow-2xl">
+          <button
+            type="button"
+            onClick={() => setMapType("satellite")}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black transition-all flex items-center space-x-1 ${
+              mapType === "satellite"
+                ? "bg-pawAmber text-white shadow-md shadow-pawAmber/30"
+                : "text-neutral-400 hover:text-white"
+            }`}
+          >
+            <span>🛰️</span>
+            <span>Satellite</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMapType("street")}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black transition-all flex items-center space-x-1 ${
+              mapType === "street"
+                ? "bg-pawAmber text-white shadow-md shadow-pawAmber/30"
+                : "text-neutral-400 hover:text-white"
+            }`}
+          >
+            <span>🗺️</span>
+            <span>Street</span>
+          </button>
+        </div>
+
+        {/* Locate Me GPS Button */}
         <button
           type="button"
           onClick={handleLocateMe}
           disabled={isLocatingMap}
-          className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-black/80 hover:bg-neutral-900 border border-neutral-700/90 text-white text-xs font-bold shadow-2xl backdrop-blur-md active:scale-95 transition-all"
+          className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-black/85 hover:bg-neutral-900 border border-neutral-700/80 text-white text-[11px] font-bold shadow-2xl backdrop-blur-md active:scale-95 transition-all"
           title="Center map on my exact GPS location"
         >
           {isLocatingMap ? (
-            <Loader2 className="w-4 h-4 text-pawAmber animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 text-pawAmber animate-spin" />
           ) : (
-            <Crosshair className="w-4 h-4 text-pawAmber" />
+            <Crosshair className="w-3.5 h-3.5 text-pawAmber" />
           )}
-          <span>{isLocatingMap ? "Locating..." : "Locate Me"}</span>
+          <span className="hidden sm:inline">{isLocatingMap ? "Locating..." : "Locate Me"}</span>
         </button>
       </div>
     </div>
