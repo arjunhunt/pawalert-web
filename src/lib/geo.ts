@@ -208,7 +208,7 @@ export function getAccurateGPSPosition(
             else if (err.code === 3) errMsg = "GPS satellite lock timed out. Please tap Detect GPS again.";
             finish({ lat: 0, lng: 0, accuracy: 9999, error: errMsg });
           },
-          { enableHighAccuracy: false, timeout: 5000, maximumAge: forceRefresh ? 0 : 30000 }
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
         );
       }
     }, maxWaitMs);
@@ -291,7 +291,17 @@ export function getCachedCoordinates(): { lat: number; lng: number; accuracy?: n
       const lat = parseFloat(latStr);
       const lng = parseFloat(lngStr);
       const accuracy = accStr ? parseFloat(accStr) : undefined;
-      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      if (
+        !isNaN(lat) &&
+        !isNaN(lng) &&
+        lat !== 0 &&
+        lng !== 0 &&
+        lat >= -90 &&
+        lat <= 90 &&
+        lng >= -180 &&
+        lng <= 180 &&
+        !(Math.abs(lat - 20.1759) < 0.005 && Math.abs(lng - 72.7549) < 0.005)
+      ) {
         return { lat, lng, accuracy };
       }
     }

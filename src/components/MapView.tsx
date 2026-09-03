@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { Crosshair, Loader2 } from "lucide-react";
 import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
 import { escapeHtml } from "@/lib/security";
+import { getDeviceGeolocation } from "@/lib/geo";
 
 interface MapViewProps {
   reports: DogReport[];
@@ -21,6 +23,27 @@ export default function MapView({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const lastCenteredLocationRef = useRef<{ lat: number; lng: number } | null>(null);
+  const [isLocatingMap, setIsLocatingMap] = useState<boolean>(false);
+
+  const handleLocateMe = async () => {
+    if (!mapInstanceRef.current) return;
+    setIsLocatingMap(true);
+    try {
+      const res = await getDeviceGeolocation(true);
+      if (res && res.lat !== 0 && res.lng !== 0) {
+        const zoomLevel = interactiveSelect ? 17 : 16;
+        mapInstanceRef.current.flyTo([res.lat, res.lng], zoomLevel, { duration: 1 });
+        lastCenteredLocationRef.current = { lat: res.lat, lng: res.lng };
+        if (interactiveSelect && onSelectCoordinate) {
+          onSelectCoordinate(res.lat, res.lng);
+        }
+      }
+    } catch (e) {
+      console.warn("Locate me error:", e);
+    } finally {
+      setIsLocatingMap(false);
+    }
+  };
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -110,23 +133,22 @@ export default function MapView({
           .addTo(map)
           .bindPopup(`<b>📍 Your Location</b><br><small style="color:#2563eb">GPS Accuracy: ±${accuracyMeters}m</small>`);
 
-        // Anti-jitter viewport centering: only fly map if distance moved is significant or first load
-        if (!interactiveSelect) {
-          const prev = lastCenteredLocationRef.current;
-          let shouldCenter = true;
-          if (prev) {
-            const dLat = Math.abs(prev.lat - userLocation.lat);
-            const dLng = Math.abs(prev.lng - userLocation.lng);
-            // ~10 meters threshold
-            if (dLat < 0.0001 && dLng < 0.0001) {
-              shouldCenter = false;
-            }
+        // Center map to real user GPS coordinates
+        const prev = lastCenteredLocationRef.current;
+        let shouldCenter = true;
+        if (prev) {
+          const dLat = Math.abs(prev.lat - userLocation.lat);
+          const dLng = Math.abs(prev.lng - userLocation.lng);
+          // ~10 meters threshold
+          if (dLat < 0.0001 && dLng < 0.0001) {
+            shouldCenter = false;
           }
+        }
 
-          if (shouldCenter) {
-            map.flyTo([userLocation.lat, userLocation.lng], 15, { duration: 0.8 });
-            lastCenteredLocationRef.current = { lat: userLocation.lat, lng: userLocation.lng };
-          }
+        if (shouldCenter) {
+          const targetZoom = interactiveSelect ? 17 : 16;
+          map.flyTo([userLocation.lat, userLocation.lng], targetZoom, { duration: 0.8 });
+          lastCenteredLocationRef.current = { lat: userLocation.lat, lng: userLocation.lng };
         }
       }
 
@@ -231,8 +253,26 @@ export default function MapView({
   }, [reports, userLocation, interactiveSelect, onSelectCoordinate]);
 
   return (
-    <div className="w-full h-full relative rounded-2xl overflow-hidden border border-darkBorder bg-darkCard">
+    <div className="w-full h-full relative rounded-2xl overflow-hidden border border-darkBorder bg-darkCard select-none">
       <div ref={mapContainerRef} className="w-full h-full min-h-[400px]" />
+
+      {/* Floating GPS Recenter Button */}
+      <div className="absolute top-3 right-3 z-[1000]">
+        <button
+          type="button"
+          onClick={handleLocateMe}
+          disabled={isLocatingMap}
+          className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-black/80 hover:bg-neutral-900 border border-neutral-700/90 text-white text-xs font-bold shadow-2xl backdrop-blur-md active:scale-95 transition-all"
+          title="Center map on my exact GPS location"
+        >
+          {isLocatingMap ? (
+            <Loader2 className="w-4 h-4 text-pawAmber animate-spin" />
+          ) : (
+            <Crosshair className="w-4 h-4 text-pawAmber" />
+          )}
+          <span>{isLocatingMap ? "Locating..." : "Locate Me"}</span>
+        </button>
+      </div>
     </div>
   );
 }
