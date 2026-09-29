@@ -10,22 +10,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        darkBg: "#141210",
-        darkCard: "#1F1B18",
-        darkCardHover: "#2B2521",
-        darkBorder: "#38312B",
+        darkBg: "#0B0C10",
+        darkCard: "#13151C",
+        darkCardHover: "#1A1D27",
+        darkBorder: "#222634",
         pawAmber: {
-          light: "#FFE0B2",
-          DEFAULT: "#EF6C00",
-          hover: "#E65100",
-          dark: "#BF360C"
+          light: "#FEF3C7",
+          DEFAULT: "#F59E0B",
+          hover: "#D97706",
+          dark: "#B45309",
         },
         status: {
-          open: "#E53935",
-          inProgress: "#FFB300",
-          resolved: "#43A047"
-        }
-      }
+          open: "#EF4444",
+          inProgress: "#F59E0B",
+          resolved: "#10B981",
+        },
+      },
     },
   },
   plugins: [],

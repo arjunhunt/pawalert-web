@@ -18,7 +18,7 @@ export default function CategoryFilter({
       {/* All Needs Chip */}
       <button
         onClick={() => onSelectCategory(null)}
-        className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
+        className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border active:scale-95 ${
           selectedCategory === null
             ? "bg-pawAmber text-white border-pawAmber shadow-md shadow-pawAmber/20"
             : "bg-darkCard text-neutral-300 border-darkBorder hover:border-neutral-600 hover:text-white"
@@ -35,7 +35,7 @@ export default function CategoryFilter({
           <button
             key={cat}
             onClick={() => onSelectCategory(isSelected ? null : cat)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border flex items-center space-x-1.5 ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border flex items-center space-x-1.5 active:scale-95 ${
               isSelected
                 ? "bg-pawAmber text-white border-pawAmber shadow-md shadow-pawAmber/20"
                 : "bg-darkCard text-neutral-300 border-darkBorder hover:border-neutral-600 hover:text-white"

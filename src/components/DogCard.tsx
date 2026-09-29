@@ -17,10 +17,10 @@ export default function DogCard({ report, distanceMeters }: DogCardProps) {
   return (
     <Link
       href={`/alert/${report.id}`}
-      className="group block bg-darkCard hover:bg-darkCardHover border border-darkBorder hover:border-pawAmber/40 rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-xl hover:shadow-pawAmber/5 flex flex-col"
+      className="group block bg-darkCard hover:bg-darkCardHover border border-darkBorder hover:border-pawAmber/50 rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-2xl hover:shadow-black/60 hover:-translate-y-0.5 flex flex-col"
     >
       {/* Photo Container with Lazy Loading & Skeleton */}
-      <div className="relative w-full h-48 sm:h-52 bg-neutral-900 overflow-hidden">
+      <div className="relative w-full h-48 sm:h-52 bg-[#0B0C10] overflow-hidden">
         {report.photo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -31,7 +31,7 @@ export default function DogCard({ report, distanceMeters }: DogCardProps) {
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-neutral-600 bg-neutral-900">
+          <div className="w-full h-full flex flex-col items-center justify-center text-neutral-600 bg-[#0B0C10]">
             <Dog className="w-12 h-12 text-pawAmber/40 mb-2" />
             <span className="text-xs">Photo not available</span>
           </div>
@@ -40,7 +40,7 @@ export default function DogCard({ report, distanceMeters }: DogCardProps) {
         {/* Top-Left: Status Badge */}
         <div className="absolute top-3 left-3">
           <span
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold uppercase tracking-wide border backdrop-blur-md ${statusInfo.bg}`}
+            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md shadow-md ${statusInfo.bg}`}
           >
             {statusInfo.label}
           </span>
@@ -48,7 +48,7 @@ export default function DogCard({ report, distanceMeters }: DogCardProps) {
 
         {/* Top-Right: Distance Badge */}
         <div className="absolute top-3 right-3">
-          <span className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-black/70 backdrop-blur-md border border-white/10">
+          <span className="flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white bg-black/65 backdrop-blur-md border border-white/10 shadow-md">
             <Navigation className="w-3 h-3 text-pawAmber" />
             <span>{formatDistance(distanceMeters)}</span>
           </span>
@@ -60,7 +60,7 @@ export default function DogCard({ report, distanceMeters }: DogCardProps) {
         <div className="space-y-2">
           {/* Problem Type & Time */}
           <div className="flex items-center justify-between">
-            <span className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-pawAmber/10 text-pawAmber font-bold text-xs border border-pawAmber/20">
+            <span className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-pawAmber/10 text-pawAmber font-semibold text-xs border border-pawAmber/20">
               <span>{catInfo.icon}</span>
               <span>{catInfo.label}</span>
             </span>
