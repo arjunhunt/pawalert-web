@@ -33,9 +33,9 @@ const PAGE_SIZE = 30;
 const MapView = dynamic(() => import("@/components/MapView"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[550px] bg-white rounded-3xl border border-brandBorder flex flex-col items-center justify-center space-y-3">
-      <div className="w-8 h-8 border-3 border-brandOrange border-t-transparent rounded-full animate-spin" />
-      <span className="text-xs font-bold text-brandTextMuted">Loading High-Definition Satellite Map...</span>
+    <div className="w-full h-[550px] bg-[#101114] rounded-xl border border-white/[0.08] flex flex-col items-center justify-center space-y-2.5">
+      <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs font-mono text-linearText-muted">Loading Satellite Radar...</span>
     </div>
   ),
 });
@@ -259,114 +259,127 @@ export default function Home() {
   }, [reports, selectedCategory, selectedStatus, userLocation]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-brandBg pb-20 md:pb-8">
-      {/* Swiggy-style Location & Header Bar */}
+    <div className="min-h-screen flex flex-col bg-[#08090A] text-[#F7F8F8] pb-16 md:pb-8">
+      {/* Linear Top Header */}
       <Navbar
         userLocation={userLocation}
         onDetectLocation={() => detectLocation(true)}
         isLocating={isLocating}
       />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-5 space-y-5">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-5 space-y-4">
         {/* Proximity Distress Alert Notifications */}
         <NotificationBanner
           incomingAlert={incomingAlert}
           onDismissAlert={() => setIncomingAlert(null)}
         />
 
-        {/* Location Diagnostic / Permission Alert */}
+        {/* Location Diagnostic Alert */}
         {locationError && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-center justify-between text-xs text-amber-900 shadow-sm">
+          <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-3 flex items-center justify-between text-xs text-amber-200">
             <div className="flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 text-brandOrange shrink-0" />
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
               <span>{locationError}</span>
             </div>
             <button
               onClick={() => setLocationError(null)}
-              className="ml-2 text-brandOrange hover:text-black font-bold text-xs"
+              className="text-amber-400 hover:text-white font-bold text-xs"
             >
               ✕
             </button>
           </div>
         )}
 
-        {/* Section 1: "What does the dog need?" Category Carousel */}
-        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-brandBorder shadow-card">
+        {/* Linear Header Bar: Title + Segmented Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+          <div>
+            <div className="flex items-center space-x-2.5">
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">
+                Active Incidents
+              </h1>
+              <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-md bg-white/[0.06] text-linearText-muted border border-white/[0.08]">
+                {filteredReports.length} {selectedStatus === "ACTIVE" ? "open" : "total"}
+              </span>
+            </div>
+            <p className="text-xs text-linearText-muted mt-0.5">
+              Community emergency dispatch & street feeder network
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-2 self-start sm:self-auto">
+            {/* Status Segmented Control */}
+            <div className="flex items-center p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.08]">
+              <button
+                onClick={() => setSelectedStatus("ACTIVE")}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                  selectedStatus === "ACTIVE"
+                    ? "bg-white/[0.12] text-white shadow-sm"
+                    : "text-linearText-muted hover:text-white"
+                }`}
+              >
+                Active
+              </button>
+              <button
+                onClick={() => setSelectedStatus("ALL")}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                  selectedStatus === "ALL"
+                    ? "bg-white/[0.12] text-white shadow-sm"
+                    : "text-linearText-muted hover:text-white"
+                }`}
+              >
+                All
+              </button>
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.08]">
+              <button
+                onClick={() => setViewMode("feed")}
+                className={`p-1.5 rounded-md transition-all ${
+                  viewMode === "feed"
+                    ? "bg-white/[0.12] text-white shadow-sm"
+                    : "text-linearText-muted hover:text-white"
+                }`}
+                title="List View"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode("map")}
+                className={`p-1.5 rounded-md transition-all ${
+                  viewMode === "map"
+                    ? "bg-white/[0.12] text-white shadow-sm"
+                    : "text-linearText-muted hover:text-white"
+                }`}
+                title="Satellite Map View"
+              >
+                <Map className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Refresh */}
+            <button
+              onClick={() => fetchReports(true)}
+              disabled={isLoading}
+              className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-linearText-muted hover:text-white transition-colors"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-white" : ""}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Linear Category Filter Chips */}
+        <div className="pt-0.5">
           <CategoryFilter
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
           />
         </div>
 
-        {/* Section 2: Swiggy Filter & View Switcher Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-brandBorder shadow-card">
-          {/* Status Tabs */}
-          <div className="flex items-center space-x-1.5">
-            <button
-              onClick={() => setSelectedStatus("ACTIVE")}
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${
-                selectedStatus === "ACTIVE"
-                  ? "bg-brandOrange text-white shadow-md shadow-brandOrange/25"
-                  : "bg-brandBg text-brandTextMuted hover:text-brandText"
-              }`}
-            >
-              Needs Help Now
-            </button>
-            <button
-              onClick={() => setSelectedStatus("ALL")}
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${
-                selectedStatus === "ALL"
-                  ? "bg-brandText text-white shadow-md shadow-black/10"
-                  : "bg-brandBg text-brandTextMuted hover:text-brandText"
-              }`}
-            >
-              All Alerts
-            </button>
-          </div>
-
-          {/* Right: View Mode Toggle & Refresh */}
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1 bg-brandBg p-1 rounded-full border border-brandBorder">
-              <button
-                onClick={() => setViewMode("feed")}
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                  viewMode === "feed"
-                    ? "bg-white text-brandOrange shadow-sm"
-                    : "text-brandTextMuted hover:text-brandText"
-                }`}
-                title="Feed View"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Feed</span>
-              </button>
-              <button
-                onClick={() => setViewMode("map")}
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                  viewMode === "map"
-                    ? "bg-white text-brandOrange shadow-sm"
-                    : "text-brandTextMuted hover:text-brandText"
-                }`}
-                title="Satellite Map View"
-              >
-                <Map className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Map</span>
-              </button>
-            </div>
-
-            <button
-              onClick={() => fetchReports(true)}
-              disabled={isLoading}
-              className="p-2 rounded-full bg-brandBg hover:bg-neutral-200 border border-brandBorder text-brandTextMuted hover:text-brandText transition-colors active:scale-95"
-              title="Refresh alerts"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-brandOrange" : ""}`} />
-            </button>
-          </div>
-        </div>
-
-        {/* Section 3: Main Content - Map or Grid Feed */}
+        {/* Main Content Area */}
         {viewMode === "map" ? (
-          <div className="h-[550px] w-full rounded-3xl overflow-hidden shadow-card border border-brandBorder">
+          <div className="h-[550px] w-full rounded-xl overflow-hidden border border-white/[0.08] shadow-linear bg-[#101114]">
             <MapView
               reports={filteredReports.map((r) => r.report)}
               userLocation={userLocation}
@@ -376,41 +389,27 @@ export default function Home() {
             />
           </div>
         ) : filteredReports.length === 0 ? (
-          <div className="bg-white border border-brandBorder rounded-3xl p-12 text-center flex flex-col items-center justify-center space-y-4 max-w-lg mx-auto my-8 shadow-card">
-            <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-brandOrange">
-              <Dog className="w-8 h-8" />
+          <div className="bg-[#101114] border border-white/[0.08] rounded-xl p-12 text-center flex flex-col items-center justify-center space-y-3 max-w-md mx-auto my-12 shadow-linear">
+            <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-linearText-muted">
+              <Dog className="w-6 h-6" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-lg font-bold text-brandText">No Dog Alerts in this Area</h3>
-              <p className="text-brandTextMuted text-xs sm:text-sm">
-                No dogs currently need help under this filter. Spotted a stray dog that needs food or medical care?
+              <h3 className="text-sm font-semibold text-white">No active incidents found</h3>
+              <p className="text-xs text-linearText-muted">
+                No stray animal alerts match this filter. Have you spotted a dog in distress?
               </p>
             </div>
-            <div className="flex items-center space-x-3 pt-2">
-              <Link
-                href="/report"
-                className="flex items-center space-x-1.5 px-5 py-2.5 rounded-full bg-brandOrange hover:bg-brandOrange-hover text-white text-xs font-bold shadow-md shadow-brandOrange/25 transition-all"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>Report Stray Dog</span>
-              </Link>
-              {(selectedCategory !== null || selectedStatus !== "ACTIVE") && (
-                <button
-                  onClick={() => {
-                    setSelectedCategory(null);
-                    setSelectedStatus("ACTIVE");
-                  }}
-                  className="text-xs text-brandTextMuted hover:text-brandText px-3 py-2 font-bold"
-                >
-                  Clear Filters
-                </button>
-              )}
-            </div>
+            <Link
+              href="/report"
+              className="mt-2 inline-flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-white hover:bg-neutral-200 text-black text-xs font-semibold tracking-tight shadow-sm transition-all"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Broadcast Alert</span>
+            </Link>
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Grid of Dog Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredReports.map(({ report, distance }) => (
                 <DogCard
                   key={report.id}
@@ -420,15 +419,14 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Pagination Load More */}
             {hasMore && (
-              <div className="flex justify-center pt-4">
+              <div className="flex justify-center pt-2">
                 <button
                   onClick={loadMoreReports}
                   disabled={isLoadingMore}
-                  className="px-6 py-2.5 rounded-full bg-white hover:bg-neutral-50 border border-brandBorder text-xs font-bold text-brandText shadow-sm transition-all"
+                  className="px-4 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-medium text-white transition-all font-mono"
                 >
-                  {isLoadingMore ? "Loading more dogs..." : "Load More Alerts"}
+                  {isLoadingMore ? "Loading..." : "Load Older Incidents"}
                 </button>
               </div>
             )}
@@ -436,10 +434,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* PWA Install Banner */}
       <InstallPwaPrompt />
-
-      {/* Mobile App Bottom Navigation Bar */}
       <BottomNav viewMode={viewMode} onToggleViewMode={setViewMode} />
     </div>
   );

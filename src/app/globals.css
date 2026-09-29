@@ -5,20 +5,21 @@
 @import "leaflet/dist/leaflet.css";
 
 :root {
-  --background: #F4F5F8;
-  --foreground: #1C1C28;
+  --background: #08090A;
+  --foreground: #F7F8F8;
 }
 
 body {
   color: var(--foreground);
   background-color: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, sans-serif;
   min-height: 100vh;
   letter-spacing: -0.015em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Hide horizontal scrollbar for category circles */
+/* Linear-style invisible scrollbars for chips */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -27,35 +28,35 @@ body {
   scrollbar-width: none;
 }
 
-/* Custom scrollbars */
+/* Linear precision scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #F4F5F8;
+  background: #08090A;
 }
 ::-webkit-scrollbar-thumb {
-  background: #D1D5DB;
-  border-radius: 4px;
+  background: #202227;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #FC8019;
+  background: #32353E;
 }
 
-/* Leaflet clean popup overrides */
+/* Leaflet Linear Dark theme overrides */
 .leaflet-popup-content-wrapper {
-  border-radius: 18px !important;
-  box-shadow: 0 12px 32px rgba(28, 28, 40, 0.15) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8) !important;
   padding: 4px !important;
-  border: 1px solid #E9ECEF !important;
-  background: #FFFFFF !important;
-  color: #1C1C28 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: #101114 !important;
+  color: #F7F8F8 !important;
 }
 .leaflet-popup-tip {
-  background: #FFFFFF !important;
+  background: #101114 !important;
 }
 .leaflet-container {
-  background-color: #F4F5F8 !important;
+  background-color: #08090A !important;
   font-family: inherit !important;
 }
