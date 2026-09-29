@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dog, PlusCircle, User, Navigation, Trophy, HeartPulse } from "lucide-react";
+import { Dog, PlusCircle, MapPin, User, Navigation, Trophy, HeartPulse, ChevronDown } from "lucide-react";
+import { reverseGeocode } from "@/lib/geo";
 
 interface NavbarProps {
   userLocation?: { lat: number; lng: number } | null;
@@ -16,105 +18,112 @@ export default function Navbar({
   isLocating,
 }: NavbarProps) {
   const pathname = usePathname();
+  const [areaName, setAreaName] = useState<string>("Detecting location...");
+
+  useEffect(() => {
+    if (userLocation && userLocation.lat !== 0 && userLocation.lng !== 0) {
+      reverseGeocode(userLocation.lat, userLocation.lng).then((addr) => {
+        if (addr) {
+          // Truncate to first 2 address tokens (e.g. "Devdham, Umargam")
+          const tokens = addr.split(",");
+          const shortAddr = tokens.slice(0, 2).join(",").trim();
+          setAreaName(shortAddr || "Location Locked");
+        }
+      });
+    } else {
+      setAreaName("Tap to Enable GPS");
+    }
+  }, [userLocation]);
 
   return (
-    <header className="sticky top-0 z-50 bg-[#0B0C10]/85 backdrop-blur-xl border-b border-darkBorder">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-brandBorder shadow-sm">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Brand Logo */}
-        <Link href="/" className="flex items-center space-x-2.5 group">
-          <div className="w-9 h-9 rounded-xl bg-pawAmber/15 flex items-center justify-center border border-pawAmber/30 group-hover:scale-105 transition-transform shadow-lg shadow-pawAmber/10">
-            <Dog className="w-5 h-5 text-pawAmber" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-1.5">
-              <span className="text-lg font-black tracking-tight text-white group-hover:text-pawAmber transition-colors">
-                Paw<span className="text-pawAmber">Alert</span>
-              </span>
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-600/20 text-blue-400 border border-blue-500/30">
-                Trial Mode
+        {/* Left: Swiggy-style Location Selector */}
+        <div className="flex items-center space-x-3">
+          <Link href="/" className="flex items-center space-x-2 group">
+            <div className="w-9 h-9 rounded-2xl bg-brandOrange flex items-center justify-center shadow-md shadow-brandOrange/25 group-hover:scale-105 transition-transform">
+              <Dog className="w-5 h-5 text-white" />
+            </div>
+            <div className="hidden sm:block">
+              <span className="text-xl font-black tracking-tight text-brandText group-hover:text-brandOrange transition-colors">
+                Paw<span className="text-brandOrange">Alert</span>
               </span>
             </div>
-            <p className="text-[11px] text-neutral-400 font-medium -mt-0.5 hidden sm:block">
-              Community Stray Dog Network
-            </p>
-          </div>
-        </Link>
+          </Link>
 
-        {/* Center / Action Buttons */}
-        <div className="flex items-center space-x-2 sm:space-x-2.5">
-          {/* Location status / detector */}
-          {onDetectLocation && (
-            <button
-              onClick={onDetectLocation}
-              disabled={isLocating}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all active:scale-95 ${
-                userLocation
-                  ? "bg-emerald-950/50 text-emerald-400 border-emerald-700/50 hover:bg-emerald-900/50"
-                  : "bg-darkCard text-neutral-300 border-darkBorder hover:border-neutral-600 hover:text-white"
-              }`}
-              title="Click to detect current GPS location"
-            >
-              <Navigation
-                className={`w-3.5 h-3.5 ${
-                  isLocating ? "animate-spin text-pawAmber" : ""
-                }`}
-              />
-              <span className="hidden md:inline">
-                {isLocating
-                  ? "Locating..."
-                  : userLocation
-                  ? "GPS Active"
-                  : "Enable GPS"}
-              </span>
-            </button>
-          )}
+          {/* Divider */}
+          <div className="h-6 w-[1px] bg-brandBorder hidden sm:block" />
 
-          {/* 24/7 Emergency Vet & Ambulance Directory Link */}
+          {/* Swiggy Location Chip */}
+          <button
+            onClick={onDetectLocation}
+            disabled={isLocating}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-brandBg hover:bg-neutral-200/60 border border-brandBorder transition-all text-left max-w-[200px] sm:max-w-[280px]"
+            title="Click to detect current GPS location"
+          >
+            <MapPin className={`w-3.5 h-3.5 shrink-0 ${isLocating ? "animate-spin text-brandOrange" : "text-brandOrange"}`} />
+            <div className="truncate">
+              <div className="flex items-center space-x-1 text-xs font-bold text-brandText truncate">
+                <span className="truncate">{areaName}</span>
+                <ChevronDown className="w-3 h-3 text-brandTextMuted shrink-0" />
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* Right: Desktop Action Links & Report Button */}
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Trial Badge */}
+          <span className="hidden sm:inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
+            Trial Mode
+          </span>
+
+          {/* 24/7 Vets */}
           <Link
             href="/vets"
-            className={`p-2 rounded-xl border transition-all active:scale-95 ${
+            className={`hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
               pathname === "/vets"
-                ? "bg-red-950/60 text-red-300 border-red-500/60"
-                : "bg-darkCard text-red-400 border-darkBorder hover:text-red-300 hover:bg-darkCardHover"
+                ? "bg-red-50 text-brandRed border border-red-200"
+                : "text-brandTextMuted hover:text-brandText hover:bg-brandBg"
             }`}
-            title="24/7 Emergency Vet & Ambulance Directory"
           >
-            <HeartPulse className="w-4 h-4 text-red-400" />
+            <HeartPulse className="w-4 h-4 text-brandRed" />
+            <span>24/7 Vets</span>
           </Link>
 
-          {/* Leaderboard Link */}
+          {/* Feeder Leaderboard */}
           <Link
             href="/leaderboard"
-            className={`p-2 rounded-xl border transition-all active:scale-95 ${
+            className={`hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
               pathname === "/leaderboard"
-                ? "bg-pawAmber/20 text-pawAmber border-pawAmber/40"
-                : "bg-darkCard text-neutral-400 border-darkBorder hover:text-white hover:bg-darkCardHover"
+                ? "bg-orange-50 text-brandOrange border border-orange-200"
+                : "text-brandTextMuted hover:text-brandText hover:bg-brandBg"
             }`}
-            title="Community Feeder Karma Leaderboard"
           >
-            <Trophy className="w-4 h-4 text-amber-400" />
+            <Trophy className="w-4 h-4 text-amber-500" />
+            <span>Karma</span>
           </Link>
 
-          {/* Profile / Karma Link */}
+          {/* Profile */}
           <Link
             href="/profile"
-            className={`p-2 rounded-xl border transition-all active:scale-95 ${
+            className={`p-2 rounded-full transition-all border ${
               pathname === "/profile"
-                ? "bg-pawAmber/20 text-pawAmber border-pawAmber/40"
-                : "bg-darkCard text-neutral-400 border-darkBorder hover:text-white hover:bg-darkCardHover"
+                ? "bg-orange-50 text-brandOrange border-orange-200"
+                : "border-brandBorder text-brandTextMuted hover:text-brandText hover:bg-brandBg"
             }`}
-            title="Volunteer Profile & Karma Stats"
+            title="Profile"
           >
             <User className="w-4 h-4" />
           </Link>
 
-          {/* Emergency Alert Broadcast Button */}
+          {/* Report Stray Dog Button */}
           <Link
             href="/report"
-            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-pawAmber hover:bg-pawAmber-hover text-white text-xs font-bold shadow-lg shadow-pawAmber/20 active:scale-95 transition-all"
+            className="flex items-center space-x-1.5 px-4 py-2 rounded-full bg-brandOrange hover:bg-brandOrange-hover text-white text-xs font-extrabold shadow-md shadow-brandOrange/25 active:scale-95 transition-all"
           >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Report Dog</span>
+            <PlusCircle className="w-4 h-4" />
+            <span className="hidden sm:inline">Report Stray Dog</span>
             <span className="sm:hidden">Report</span>
           </Link>
         </div>

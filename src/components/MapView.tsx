@@ -275,15 +275,16 @@ export default function MapView({
                 : `<a href="/alert/${encodeURIComponent(report.id)}" style="
                     display: block;
                     text-align: center;
-                    background-color: #EF6C00;
+                    background-color: #FC8019;
                     color: white;
                     text-decoration: none;
-                    padding: 6px 12px;
-                    border-radius: 8px;
+                    padding: 8px 14px;
+                    border-radius: 9999px;
                     font-size: 12px;
-                    font-weight: 700;
+                    font-weight: 800;
+                    box-shadow: 0 4px 12px rgba(252, 128, 25, 0.25);
                   ">
-                    View Alert & Help 🐾
+                    View & Help Dog 🐾
                   </a>`
             }
           </div>
@@ -317,7 +318,7 @@ export default function MapView({
   }, [reports, userLocation, interactiveSelect, onSelectCoordinate]);
 
   return (
-    <div className="w-full h-full relative rounded-2xl overflow-hidden border border-darkBorder bg-darkCard select-none">
+    <div className="w-full h-full relative rounded-3xl overflow-hidden border border-brandBorder bg-white select-none">
       <div ref={mapContainerRef} className="w-full h-full min-h-[400px]" />
 
       {/* Floating Controls: Layer Switcher & Locate Me Button */}
@@ -325,27 +326,27 @@ export default function MapView({
         {/* GPS Satellite Accuracy Pill */}
         {userLocation?.accuracy !== undefined && userLocation.accuracy > 0 && (
           <div
-            className={`hidden sm:flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border backdrop-blur-md shadow-2xl text-[10px] font-bold ${
+            className={`hidden sm:flex items-center space-x-1 px-3 py-1.5 rounded-full border backdrop-blur-md shadow-card text-[11px] font-bold ${
               userLocation.accuracy <= 20
-                ? "bg-emerald-950/85 border-emerald-700/80 text-emerald-400"
-                : "bg-amber-950/85 border-amber-700/80 text-amber-300"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                : "bg-amber-50 border-amber-200 text-amber-800"
             }`}
             title={`GPS Satellite Precision: ±${Math.round(userLocation.accuracy)}m`}
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${userLocation.accuracy <= 20 ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+            <span className={`w-2 h-2 rounded-full ${userLocation.accuracy <= 20 ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
             <span>±{Math.round(userLocation.accuracy)}m</span>
           </div>
         )}
 
         {/* Satellite vs Street Toggle */}
-        <div className="bg-black/85 backdrop-blur-md border border-neutral-700/80 rounded-xl p-0.5 flex items-center space-x-0.5 shadow-2xl">
+        <div className="bg-white/95 backdrop-blur-md border border-brandBorder rounded-full p-1 flex items-center space-x-0.5 shadow-card">
           <button
             type="button"
             onClick={() => setMapType("satellite")}
-            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black transition-all flex items-center space-x-1 ${
+            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center space-x-1 ${
               mapType === "satellite"
-                ? "bg-pawAmber text-white shadow-md shadow-pawAmber/30"
-                : "text-neutral-400 hover:text-white"
+                ? "bg-brandOrange text-white shadow-sm"
+                : "text-brandTextMuted hover:text-brandText"
             }`}
           >
             <span>🛰️</span>
@@ -354,10 +355,10 @@ export default function MapView({
           <button
             type="button"
             onClick={() => setMapType("street")}
-            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black transition-all flex items-center space-x-1 ${
+            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center space-x-1 ${
               mapType === "street"
-                ? "bg-pawAmber text-white shadow-md shadow-pawAmber/30"
-                : "text-neutral-400 hover:text-white"
+                ? "bg-brandOrange text-white shadow-sm"
+                : "text-brandTextMuted hover:text-brandText"
             }`}
           >
             <span>🗺️</span>
@@ -370,13 +371,13 @@ export default function MapView({
           type="button"
           onClick={handleLocateMe}
           disabled={isLocatingMap}
-          className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-black/85 hover:bg-neutral-900 border border-neutral-700/80 text-white text-[11px] font-bold shadow-2xl backdrop-blur-md active:scale-95 transition-all"
+          className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-white/95 hover:bg-neutral-50 border border-brandBorder text-brandText text-xs font-bold shadow-card backdrop-blur-md active:scale-95 transition-all"
           title="Center map on my exact GPS location"
         >
           {isLocatingMap ? (
-            <Loader2 className="w-3.5 h-3.5 text-pawAmber animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 text-brandOrange animate-spin" />
           ) : (
-            <Crosshair className="w-3.5 h-3.5 text-pawAmber" />
+            <Crosshair className="w-3.5 h-3.5 text-brandOrange" />
           )}
           <span className="hidden sm:inline">{isLocatingMap ? "Locating..." : "Locate Me"}</span>
         </button>

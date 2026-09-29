@@ -11,10 +11,10 @@ import {
   PlusCircle,
   AlertCircle,
   Compass,
-  ChevronDown,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import DogCard from "@/components/DogCard";
+import BottomNav from "@/components/BottomNav";
 import NotificationBanner from "@/components/NotificationBanner";
 import InstallPwaPrompt from "@/components/InstallPwaPrompt";
 import CategoryFilter from "@/components/CategoryFilter";
@@ -33,9 +33,9 @@ const PAGE_SIZE = 30;
 const MapView = dynamic(() => import("@/components/MapView"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[500px] rounded-2xl bg-darkCard border border-darkBorder flex items-center justify-center text-neutral-400">
-      <Compass className="w-8 h-8 animate-spin text-pawAmber mr-2" />
-      <span>Loading Interactive Dog Map...</span>
+    <div className="w-full h-[550px] bg-white rounded-3xl border border-brandBorder flex flex-col items-center justify-center space-y-3">
+      <div className="w-8 h-8 border-3 border-brandOrange border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs font-bold text-brandTextMuted">Loading High-Definition Satellite Map...</span>
     </div>
   ),
 });
@@ -90,10 +90,9 @@ export default function Home() {
   const loadMoreReports = async () => {
     if (isLoadingMore || !hasMore) return;
     setIsLoadingMore(true);
-
     const nextPage = page + 1;
-    const from = nextPage * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+    const start = nextPage * PAGE_SIZE;
+    const end = start + PAGE_SIZE - 1;
 
     try {
       if (isSupabaseConfigured && supabase) {
@@ -101,19 +100,17 @@ export default function Home() {
           .from("reports")
           .select("*")
           .order("created_at", { ascending: false })
-          .range(from, to);
+          .range(start, end);
 
         if (!error && data) {
-          const newItems = data as DogReport[];
-          if (newItems.length < PAGE_SIZE) {
+          const loaded = data as DogReport[];
+          if (loaded.length < PAGE_SIZE) {
             setHasMore(false);
           }
           setReports((prev) => {
-            const existingIds = new Set(prev.map((r) => r.id));
-            const unique = newItems.filter((r) => !existingIds.has(r.id));
-            const updated = [...prev, ...unique];
-            memoryReportsCache = updated;
-            return updated;
+            const merged = [...prev, ...loaded.filter((n) => !prev.some((p) => p.id === n.id))];
+            memoryReportsCache = merged;
+            return merged;
           });
           setPage(nextPage);
         }
@@ -183,16 +180,17 @@ export default function Home() {
               }
 
               const maxRadiusKm = getAlertRadiusKm();
-              const withinRadius = distM === null || maxRadiusKm === 0 || distM <= maxRadiusKm * 1000;
+              const maxRadiusM = maxRadiusKm * 1000;
 
-              if (withinRadius) {
+              if (distM === null || distM <= maxRadiusM) {
                 sendProximityAlert(newReport, distM);
                 setIncomingAlert({ report: newReport, distanceMeters: distM });
               }
             } else if (payload.eventType === "UPDATE") {
+              const updatedReport = payload.new as DogReport;
               setReports((prev) => {
                 const updated = prev.map((r) =>
-                  r.id === payload.new.id ? (payload.new as DogReport) : r
+                  r.id === updatedReport.id ? updatedReport : r
                 );
                 memoryReportsCache = updated;
                 return updated;
@@ -261,134 +259,114 @@ export default function Home() {
   }, [reports, selectedCategory, selectedStatus, userLocation]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-darkBg">
-      <Navbar />
+    <div className="min-h-screen flex flex-col bg-brandBg pb-20 md:pb-8">
+      {/* Swiggy-style Location & Header Bar */}
+      <Navbar
+        userLocation={userLocation}
+        onDetectLocation={() => detectLocation(true)}
+        isLocating={isLocating}
+      />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
-        {/* Proximity Distress Alert Notifications & Permission Prompt */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-5 space-y-5">
+        {/* Proximity Distress Alert Notifications */}
         <NotificationBanner
           incomingAlert={incomingAlert}
           onDismissAlert={() => setIncomingAlert(null)}
         />
 
-        {/* Location Permission / Diagnostic Banner */}
+        {/* Location Diagnostic / Permission Alert */}
         {locationError && (
-          <div className="bg-amber-950/60 border border-amber-500/40 rounded-2xl p-3.5 flex items-center justify-between text-xs text-amber-200">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-center justify-between text-xs text-amber-900 shadow-sm">
             <div className="flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-brandOrange shrink-0" />
               <span>{locationError}</span>
             </div>
             <button
               onClick={() => setLocationError(null)}
-              className="ml-2 text-amber-400 hover:text-white font-bold text-xs"
+              className="ml-2 text-brandOrange hover:text-black font-bold text-xs"
             >
               ✕
             </button>
           </div>
         )}
-        
-        {/* Top Control Bar */}
-        <div className="flex flex-col items-center gap-3.5 bg-darkCard/90 backdrop-blur-xl p-4 sm:p-5 rounded-3xl border border-darkBorder shadow-xl">
+
+        {/* Section 1: "What does the dog need?" Category Carousel */}
+        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-brandBorder shadow-card">
+          <CategoryFilter
+            selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
+          />
+        </div>
+
+        {/* Section 2: Swiggy Filter & View Switcher Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-brandBorder shadow-card">
           {/* Status Tabs */}
-          <div className="flex items-center justify-center space-x-1 bg-darkBg p-1 rounded-full border border-darkBorder">
+          <div className="flex items-center space-x-1.5">
             <button
               onClick={() => setSelectedStatus("ACTIVE")}
-              className={`px-4 sm:px-5 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${
                 selectedStatus === "ACTIVE"
-                  ? "bg-pawAmber text-white shadow-md shadow-pawAmber/25"
-                  : "text-neutral-400 hover:text-white"
+                  ? "bg-brandOrange text-white shadow-md shadow-brandOrange/25"
+                  : "bg-brandBg text-brandTextMuted hover:text-brandText"
               }`}
             >
-              Needs Help (Active)
+              Needs Help Now
             </button>
             <button
               onClick={() => setSelectedStatus("ALL")}
-              className={`px-4 sm:px-5 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${
                 selectedStatus === "ALL"
-                  ? "bg-neutral-800 text-white"
-                  : "text-neutral-400 hover:text-white"
+                  ? "bg-brandText text-white shadow-md shadow-black/10"
+                  : "bg-brandBg text-brandTextMuted hover:text-brandText"
               }`}
             >
               All Alerts
             </button>
           </div>
 
-          {/* Centered + Report Dog Button */}
-          <div className="flex justify-center w-full">
-            <Link
-              href="/report"
-              className="flex items-center justify-center space-x-2 bg-pawAmber hover:bg-pawAmber-hover text-white px-6 py-2.5 rounded-full text-xs sm:text-sm font-bold shadow-lg shadow-pawAmber/20 active:scale-[0.98] transition-all"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>Report Stray Dog in Need</span>
-            </Link>
-          </div>
-
-          {/* Location & View Controls */}
-          <div className="flex items-center justify-between space-x-3 w-full pt-2 border-t border-darkBorder">
-            <button
-              onClick={() => detectLocation(true)}
-              disabled={isLocating}
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-darkBg hover:bg-neutral-800 border border-darkBorder text-xs text-neutral-300 transition-colors active:scale-95"
-              title="Update your GPS location"
-            >
-              <Compass className={`w-3.5 h-3.5 text-pawAmber ${isLocating ? "animate-spin" : ""}`} />
-              <span className="font-medium">
-                {userLocation ? "GPS Active" : "Detect GPS"}
-              </span>
-            </button>
-
-            <div className="flex items-center space-x-2">
-              {/* View Mode Toggle: Feed vs Map */}
-              <div className="flex items-center space-x-1 bg-darkBg p-1 rounded-full border border-darkBorder">
-                <button
-                  onClick={() => setViewMode("feed")}
-                  className={`p-2 rounded-full transition-all ${
-                    viewMode === "feed"
-                      ? "bg-pawAmber text-white shadow-md shadow-pawAmber/20"
-                      : "text-neutral-400 hover:text-white"
-                  }`}
-                  title="Feed View"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode("map")}
-                  className={`p-2 rounded-full transition-all ${
-                    viewMode === "map"
-                      ? "bg-pawAmber text-white shadow-md shadow-pawAmber/20"
-                      : "text-neutral-400 hover:text-white"
-                  }`}
-                  title="Map View"
-                >
-                  <Map className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Manual Refresh */}
+          {/* Right: View Mode Toggle & Refresh */}
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 bg-brandBg p-1 rounded-full border border-brandBorder">
               <button
-                onClick={() => fetchReports(true)}
-                disabled={isLoading}
-                className="p-2 rounded-2xl bg-darkBg hover:bg-neutral-800 border border-darkBorder text-neutral-400 hover:text-white transition-colors"
-                title="Refresh Feed"
+                onClick={() => setViewMode("feed")}
+                className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  viewMode === "feed"
+                    ? "bg-white text-brandOrange shadow-sm"
+                    : "text-brandTextMuted hover:text-brandText"
+                }`}
+                title="Feed View"
               >
-                <RefreshCw
-                  className={`w-4 h-4 ${isLoading ? "animate-spin text-pawAmber" : ""}`}
-                />
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Feed</span>
+              </button>
+              <button
+                onClick={() => setViewMode("map")}
+                className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  viewMode === "map"
+                    ? "bg-white text-brandOrange shadow-sm"
+                    : "text-brandTextMuted hover:text-brandText"
+                }`}
+                title="Satellite Map View"
+              >
+                <Map className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Map</span>
               </button>
             </div>
+
+            <button
+              onClick={() => fetchReports(true)}
+              disabled={isLoading}
+              className="p-2 rounded-full bg-brandBg hover:bg-neutral-200 border border-brandBorder text-brandTextMuted hover:text-brandText transition-colors active:scale-95"
+              title="Refresh alerts"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-brandOrange" : ""}`} />
+            </button>
           </div>
         </div>
 
-        {/* Category Need Filter Chips */}
-        <CategoryFilter
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-        />
-
-        {/* Main Content: Map or Grid Feed */}
+        {/* Section 3: Main Content - Map or Grid Feed */}
         {viewMode === "map" ? (
-          <div className="h-[550px] w-full">
+          <div className="h-[550px] w-full rounded-3xl overflow-hidden shadow-card border border-brandBorder">
             <MapView
               reports={filteredReports.map((r) => r.report)}
               userLocation={userLocation}
@@ -398,31 +376,31 @@ export default function Home() {
             />
           </div>
         ) : filteredReports.length === 0 ? (
-          <div className="bg-darkCard/50 border border-darkBorder rounded-3xl p-12 text-center flex flex-col items-center justify-center space-y-4 max-w-lg mx-auto my-8">
-            <div className="w-16 h-16 rounded-2xl bg-pawAmber/10 border border-pawAmber/20 flex items-center justify-center text-pawAmber">
+          <div className="bg-white border border-brandBorder rounded-3xl p-12 text-center flex flex-col items-center justify-center space-y-4 max-w-lg mx-auto my-8 shadow-card">
+            <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-brandOrange">
               <Dog className="w-8 h-8" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-lg font-bold text-white">No Dog Alerts in this Area</h3>
-              <p className="text-neutral-400 text-xs sm:text-sm">
-                No dogs currently need help in this filter. Seen a stray dog that needs food or care?
+              <h3 className="text-lg font-bold text-brandText">No Dog Alerts in this Area</h3>
+              <p className="text-brandTextMuted text-xs sm:text-sm">
+                No dogs currently need help under this filter. Spotted a stray dog that needs food or medical care?
               </p>
             </div>
             <div className="flex items-center space-x-3 pt-2">
-              <a
+              <Link
                 href="/report"
-                className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-pawAmber hover:bg-pawAmber-hover text-white text-xs font-bold shadow-lg shadow-pawAmber/20 transition-all"
+                className="flex items-center space-x-1.5 px-5 py-2.5 rounded-full bg-brandOrange hover:bg-brandOrange-hover text-white text-xs font-bold shadow-md shadow-brandOrange/25 transition-all"
               >
                 <PlusCircle className="w-4 h-4" />
-                <span>Report a Dog Alert</span>
-              </a>
+                <span>Report Stray Dog</span>
+              </Link>
               {(selectedCategory !== null || selectedStatus !== "ACTIVE") && (
                 <button
                   onClick={() => {
                     setSelectedCategory(null);
                     setSelectedStatus("ACTIVE");
                   }}
-                  className="text-xs text-neutral-400 hover:text-white px-3 py-2"
+                  className="text-xs text-brandTextMuted hover:text-brandText px-3 py-2 font-bold"
                 >
                   Clear Filters
                 </button>
@@ -430,7 +408,8 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
+            {/* Grid of Dog Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {filteredReports.map(({ report, distance }) => (
                 <DogCard
@@ -441,16 +420,15 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Load More Pagination Button */}
+            {/* Pagination Load More */}
             {hasMore && (
               <div className="flex justify-center pt-4">
                 <button
                   onClick={loadMoreReports}
                   disabled={isLoadingMore}
-                  className="flex items-center space-x-2 px-6 py-3 rounded-2xl bg-darkCard hover:bg-darkCardHover border border-darkBorder hover:border-pawAmber/40 text-neutral-200 text-xs sm:text-sm font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
+                  className="px-6 py-2.5 rounded-full bg-white hover:bg-neutral-50 border border-brandBorder text-xs font-bold text-brandText shadow-sm transition-all"
                 >
-                  <ChevronDown className={`w-4 h-4 text-pawAmber ${isLoadingMore ? "animate-bounce" : ""}`} />
-                  <span>{isLoadingMore ? "Loading more alerts..." : "Load More Alerts"}</span>
+                  {isLoadingMore ? "Loading more dogs..." : "Load More Alerts"}
                 </button>
               </div>
             )}
@@ -458,16 +436,11 @@ export default function Home() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-darkBorder py-6 bg-darkCard text-center text-xs text-neutral-500">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>🐾 PawAlert — Connecting community feeders with dogs in need</span>
-          <span>Open Source Community Project</span>
-        </div>
-      </footer>
-
-      {/* PWA 1-Click Install Prompt */}
+      {/* PWA Install Banner */}
       <InstallPwaPrompt />
+
+      {/* Mobile App Bottom Navigation Bar */}
+      <BottomNav viewMode={viewMode} onToggleViewMode={setViewMode} />
     </div>
   );
 }
