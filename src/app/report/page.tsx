@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -20,7 +20,7 @@ import {
 import Navbar from "@/components/Navbar";
 import PhotoUpload from "@/components/PhotoUpload";
 import { ProblemType, PROBLEM_TYPE_LABELS, DogReport } from "@/lib/types";
-import { reverseGeocodeDetailed, getAccurateGPSPosition, getCachedCoordinates, forwardGeocode } from "@/lib/geo";
+import { reverseGeocodeDetailed, getAccurateGPSPosition, getCachedCoordinates, forwardGeocode, watchLiveHardwareGPS } from "@/lib/geo";
 import { getUserId, getUserName, addMyReportId, syncStatsToCloud } from "@/lib/user";
 import {
   isSafeImageUrl,
@@ -92,17 +92,32 @@ export default function ReportPage() {
   const [street, setStreet] = useState<string>("");
   const [landmark, setLandmark] = useState<string>("");
   const [city, setCity] = useState<string>("");
-  const [state, setState] = useState<string>("Gujarat");
+  const [state, setState] = useState<string>("");
 
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  // Auto-detect browser GPS and user handle on mount
+  const isManualPinRef = useRef<boolean>(false);
+
+  // Auto-detect browser GPS and stream live satellite accuracy
   useEffect(() => {
     const savedName = localStorage.getItem("pawalert_user_name");
     if (savedName) setReporterName(savedName);
     detectLocation();
+
+    const stopWatcher = watchLiveHardwareGPS((coords) => {
+      // Only auto-update if the user hasn't manually placed a custom pinpoint on the satellite map
+      if (!isManualPinRef.current) {
+        setLatitude(coords.lat);
+        setLongitude(coords.lng);
+        setGpsAccuracy(coords.accuracy);
+      }
+    });
+
+    return () => {
+      stopWatcher();
+    };
   }, []);
 
   const handlePhotoUploaded = (url: string) => {
@@ -112,8 +127,9 @@ export default function ReportPage() {
   const detectLocation = async () => {
     setIsLocating(true);
     setErrorMessage("");
+    isManualPinRef.current = false;
     try {
-      const res = await getAccurateGPSPosition(true, 6000);
+      const res = await getAccurateGPSPosition(true, 7000);
       if (res && res.lat !== 0 && res.lng !== 0) {
         setLatitude(res.lat);
         setLongitude(res.lng);
@@ -137,6 +153,7 @@ export default function ReportPage() {
   };
 
   const handleMapCoordinatePicked = async (lat: number, lng: number) => {
+    isManualPinRef.current = true;
     setLatitude(lat);
     setLongitude(lng);
     setGpsAccuracy(1); // Manually verified exact pinpoint!

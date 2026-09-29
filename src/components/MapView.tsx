@@ -178,10 +178,10 @@ export default function MapView({
 
         // Accuracy Halo Ring
         L.circle([userLocation.lat, userLocation.lng], {
-          radius: Math.min(Math.max(accuracyMeters, 10), 120),
-          color: "#3b82f6",
-          fillColor: "#3b82f6",
-          fillOpacity: 0.14,
+          radius: Math.min(Math.max(accuracyMeters, 5), 100),
+          color: accuracyMeters <= 20 ? "#10b981" : "#3b82f6",
+          fillColor: accuracyMeters <= 20 ? "#10b981" : "#3b82f6",
+          fillOpacity: 0.12,
           weight: 1.5,
           dashArray: "4, 4",
         }).addTo(map);
@@ -204,8 +204,8 @@ export default function MapView({
         if (prev) {
           const dLat = Math.abs(prev.lat - userLocation.lat);
           const dLng = Math.abs(prev.lng - userLocation.lng);
-          // ~10 meters threshold
-          if (dLat < 0.0001 && dLng < 0.0001) {
+          // Only recenter if location changed by more than ~15 meters
+          if (dLat < 0.00015 && dLng < 0.00015) {
             shouldCenter = false;
           }
         }
@@ -322,6 +322,21 @@ export default function MapView({
 
       {/* Floating Controls: Layer Switcher & Locate Me Button */}
       <div className="absolute top-3 right-3 z-[1000] flex items-center space-x-1.5">
+        {/* GPS Satellite Accuracy Pill */}
+        {userLocation?.accuracy !== undefined && userLocation.accuracy > 0 && (
+          <div
+            className={`hidden sm:flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border backdrop-blur-md shadow-2xl text-[10px] font-bold ${
+              userLocation.accuracy <= 20
+                ? "bg-emerald-950/85 border-emerald-700/80 text-emerald-400"
+                : "bg-amber-950/85 border-amber-700/80 text-amber-300"
+            }`}
+            title={`GPS Satellite Precision: ±${Math.round(userLocation.accuracy)}m`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${userLocation.accuracy <= 20 ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+            <span>±{Math.round(userLocation.accuracy)}m</span>
+          </div>
+        )}
+
         {/* Satellite vs Street Toggle */}
         <div className="bg-black/85 backdrop-blur-md border border-neutral-700/80 rounded-xl p-0.5 flex items-center space-x-0.5 shadow-2xl">
           <button

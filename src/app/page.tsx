@@ -20,7 +20,7 @@ import InstallPwaPrompt from "@/components/InstallPwaPrompt";
 import CategoryFilter from "@/components/CategoryFilter";
 import { DogReport, ProblemType, ReportStatus } from "@/lib/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { calculateDistanceMeters, getDeviceGeolocation, getCachedCoordinates } from "@/lib/geo";
+import { calculateDistanceMeters, getDeviceGeolocation, getCachedCoordinates, watchLiveHardwareGPS } from "@/lib/geo";
 import { sendProximityAlert, getAlertRadiusKm } from "@/lib/notifications";
 
 // Global in-memory SWR cache for 0ms instant page loads
@@ -148,7 +148,12 @@ export default function Home() {
   // Initial load & Supabase Realtime setup
   useEffect(() => {
     fetchReports();
-    detectLocation();
+    detectLocation(true);
+
+    // Continuous live hardware GPS stream for progressive satellite convergence
+    const stopWatcher = watchLiveHardwareGPS((coords) => {
+      setUserLocation(coords);
+    });
 
     if (isSupabaseConfigured && supabase) {
       // Subscribe to real-time additions and updates
@@ -204,9 +209,14 @@ export default function Home() {
         .subscribe();
 
       return () => {
+        stopWatcher();
         supabase?.removeChannel(channel);
       };
     }
+
+    return () => {
+      stopWatcher();
+    };
   }, [fetchReports]);
 
   // Filter and sort reports nearest first
