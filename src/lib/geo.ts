@@ -94,9 +94,9 @@ export function getAccurateGPSPosition(
         watchId = null;
       }
 
-      // If user has manually verified their location, don't overwrite with coarse Wi-Fi (> 100m)
+      // If user has manually verified their location, don't overwrite with coarse Wi-Fi (> 50m)
       const isManual = typeof window !== "undefined" && localStorage.getItem("pawalert_manual_location") === "true";
-      if (isManual && result.accuracy > 100) {
+      if (isManual && result.accuracy > 50) {
         const cached = getCachedCoordinates();
         if (cached && cached.lat !== 0) {
           resolve({
@@ -212,6 +212,12 @@ export function watchLiveHardwareGPS(
   const watchId = navigator.geolocation.watchPosition(
     (pos) => {
       const acc = Math.round(pos.coords.accuracy || 50);
+      const isManual = typeof window !== "undefined" && localStorage.getItem("pawalert_manual_location") === "true";
+      // If user has locked their position manually, ignore any coarse fix (> 50m)
+      if (isManual && acc > 50) {
+        return;
+      }
+
       // Update whenever accuracy is better or reasonable (< 35m)
       if (acc <= bestAccuracy || acc <= 35) {
         if (acc < bestAccuracy) bestAccuracy = acc;

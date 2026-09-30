@@ -627,22 +627,55 @@ export default function MapView({
         </div>
       )}
 
-      {/* Coarse Location Warning Helper (Shown when browser accuracy is > 500m on laptops/PCs) */}
-      {userLocation?.accuracy !== undefined && userLocation.accuracy > 500 && showCoarseWarning && (
-        <div className="absolute bottom-3 left-3 right-3 sm:left-auto sm:right-3 sm:max-w-md z-[1000] bg-amber-950/90 border border-amber-500/60 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md text-amber-200 text-xs flex items-center justify-between gap-2">
-          <div className="flex items-center space-x-2 min-w-0">
-            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-            <span className="truncate">
-              Laptop Wi-Fi location is coarse (±{(userLocation.accuracy / 1000).toFixed(1)}km). Drag the blue pin or search above to set your real spot.
-            </span>
+      {/* Coarse Location Warning & Quick Calibrate Banner (Shown when accuracy > 200m on laptops/PCs) */}
+      {userLocation?.accuracy !== undefined && userLocation.accuracy > 200 && showCoarseWarning && (
+        <div className="absolute bottom-3 left-3 right-3 sm:left-auto sm:right-3 sm:max-w-md z-[1000] bg-neutral-900/95 border border-amber-500/80 rounded-2xl p-3 shadow-2xl backdrop-blur-md text-white text-xs space-y-2 animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="font-bold text-amber-300">
+                Laptop Wi-Fi Drift (±{userLocation.accuracy > 999 ? `${(userLocation.accuracy / 1000).toFixed(1)}km` : `${userLocation.accuracy}m`})
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCoarseWarning(false)}
+              className="text-neutral-400 hover:text-white text-sm font-bold"
+              title="Dismiss banner"
+            >
+              ✕
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowCoarseWarning(false)}
-            className="text-amber-400 hover:text-white p-1 shrink-0 font-bold"
-          >
-            ✕
-          </button>
+          <p className="text-[11px] text-neutral-300 leading-relaxed">
+            Laptops lack satellite GPS hardware; Chrome estimates location via Wi-Fi/ISP. On smartphones, PawAlert locks onto real GNSS satellites with <b>7–8m accuracy</b>.
+          </p>
+          <div className="flex items-center gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                setIsPinpointMode(true);
+                setShowCoarseWarning(false);
+              }}
+              className="flex-1 py-1.5 px-2.5 rounded-xl bg-pawAmber hover:bg-pawAmber-hover text-white text-[11px] font-bold transition-all flex items-center justify-center space-x-1 shadow-md shadow-pawAmber/20"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Tap Map to Place Pin</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const searchEl = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+                if (searchEl) {
+                  searchEl.focus();
+                  searchEl.select();
+                }
+              }}
+              className="py-1.5 px-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 text-[11px] font-semibold transition-all flex items-center space-x-1"
+            >
+              <Search className="w-3 h-3 text-pawAmber" />
+              <span>Search Area</span>
+            </button>
+          </div>
         </div>
       )}
     </div>
