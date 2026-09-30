@@ -262,7 +262,11 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-darkBg">
-      <Navbar />
+      <Navbar
+        userLocation={userLocation}
+        onDetectLocation={() => detectLocation(true)}
+        isLocating={isLocating}
+      />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
         {/* Proximity Distress Alert Notifications & Permission Prompt */}
