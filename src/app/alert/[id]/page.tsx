@@ -135,18 +135,6 @@ export default function AlertDetailPage() {
         }
       }
 
-      // Check offline / newly created local reports in localStorage
-      try {
-        const localList = JSON.parse(localStorage.getItem("pawalert_local_reports") || "[]");
-        const foundLocal = Array.isArray(localList) ? localList.find((r: any) => String(r.id) === String(id)) : null;
-        if (foundLocal) {
-          const loaded = normalize(foundLocal);
-          setReport(loaded);
-          setIsAuthor(isMyReport(loaded));
-          return;
-        }
-      } catch (e) {}
-
       // Fallback demo report finder
       const demo = DEMO_REPORTS.find((r) => r.id === id) || DEMO_REPORTS[0];
       const fallback = normalize(demo);
@@ -216,16 +204,6 @@ export default function AlertDetailPage() {
         })
         .eq("id", id);
     }
-
-    try {
-      const localList = JSON.parse(localStorage.getItem("pawalert_local_reports") || "[]");
-      const idx = localList.findIndex((r: any) => String(r.id) === String(id));
-      if (idx !== -1) {
-        localList[idx] = updated;
-        localStorage.setItem("pawalert_local_reports", JSON.stringify(localList));
-      }
-    } catch (e) {}
-
     setReport(updated);
     setIsUpdating(false);
   };
@@ -245,15 +223,6 @@ export default function AlertDetailPage() {
         .update({ status: "RESOLVED" })
         .eq("id", id);
     }
-
-    try {
-      const localList = JSON.parse(localStorage.getItem("pawalert_local_reports") || "[]");
-      const idx = localList.findIndex((r: any) => String(r.id) === String(id));
-      if (idx !== -1) {
-        localList[idx] = updated;
-        localStorage.setItem("pawalert_local_reports", JSON.stringify(localList));
-      }
-    } catch (e) {}
 
     // Increment personal user stats in localStorage & Supabase Cloud
     const curFed = parseInt(localStorage.getItem("pawalert_dogs_fed") || "0", 10);

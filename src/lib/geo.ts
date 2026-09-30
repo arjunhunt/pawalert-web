@@ -93,8 +93,8 @@ export function getAccurateGPSPosition(
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
       }
-      // Cache if accuracy is a usable GPS/Wi-Fi fix (<= 60m)
-      if (result.lat !== 0 && result.lng !== 0 && result.accuracy <= 60) {
+      // ONLY cache if accuracy is true satellite precision (<= 25m)
+      if (result.lat !== 0 && result.lng !== 0 && result.accuracy <= 25) {
         cacheCoordinates(result.lat, result.lng, result.accuracy);
       }
       resolve(result);
@@ -198,15 +198,15 @@ export function watchLiveHardwareGPS(
   const watchId = navigator.geolocation.watchPosition(
     (pos) => {
       const acc = Math.round(pos.coords.accuracy || 50);
-      // Update whenever accuracy is better or reasonable (< 60m)
-      if (acc <= bestAccuracy || acc <= 60) {
+      // Update whenever accuracy is better or reasonable (< 35m)
+      if (acc <= bestAccuracy || acc <= 35) {
         if (acc < bestAccuracy) bestAccuracy = acc;
         onUpdate({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           accuracy: acc,
         });
-        if (acc <= 60) {
+        if (acc <= 20) {
           cacheCoordinates(pos.coords.latitude, pos.coords.longitude, acc);
         }
       }
@@ -258,13 +258,13 @@ export function clearCachedCoordinates(): void {
 }
 
 /**
- * Caches coordinates for quick instant restoration on app load.
+ * Caches coordinates ONLY if accuracy is true satellite precision (<= 25m).
+ * Saves timestamp to enforce strict 5-minute TTL.
  */
 export function cacheCoordinates(lat: number, lng: number, accuracy?: number): void {
   if (typeof window === "undefined") return;
-  if (!lat || !lng || (lat === 0 && lng === 0)) return;
-  // Don't cache cell-tower fixes with excessive drift (> 60m)
-  if (accuracy && accuracy > 60) return;
+  // NEVER cache coarse cell-tower or Wi-Fi fixes (> 25m) as trusted location
+  if (accuracy && accuracy > 25) return;
   try {
     localStorage.setItem("pawalert_user_lat", lat.toString());
     localStorage.setItem("pawalert_user_lng", lng.toString());
@@ -276,11 +276,25 @@ export function cacheCoordinates(lat: number, lng: number, accuracy?: number): v
 }
 
 /**
- * Retrieves cached coordinates immediately so location is never blank on page load.
+ * Retrieves cached coordinates ONLY if younger than 5 minutes.
+ * Prevents stale multi-day location persistence.
  */
 export function getCachedCoordinates(): { lat: number; lng: number; accuracy?: number } | null {
   if (typeof window === "undefined") return null;
   try {
+    const timeStr = localStorage.getItem("pawalert_user_geo_time");
+    // Strict 5-minute TTL: Discard if older than 5 minutes or missing timestamp
+    if (!timeStr) {
+      clearCachedCoordinates();
+      return null;
+    }
+    const savedTime = parseInt(timeStr, 10);
+    const MAX_CACHE_AGE_MS = 5 * 60 * 1000; // 5 minutes
+    if (Date.now() - savedTime > MAX_CACHE_AGE_MS) {
+      clearCachedCoordinates();
+      return null;
+    }
+
     const latStr = localStorage.getItem("pawalert_user_lat");
     const lngStr = localStorage.getItem("pawalert_user_lng");
     const accStr = localStorage.getItem("pawalert_user_accuracy");
@@ -296,7 +310,8 @@ export function getCachedCoordinates(): { lat: number; lng: number; accuracy?: n
         lat >= -90 &&
         lat <= 90 &&
         lng >= -180 &&
-        lng <= 180
+        lng <= 180 &&
+        !(Math.abs(lat - 20.1759) < 0.005 && Math.abs(lng - 72.7549) < 0.005)
       ) {
         return { lat, lng, accuracy };
       }

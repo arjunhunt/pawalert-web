@@ -19,7 +19,7 @@ import NotificationBanner from "@/components/NotificationBanner";
 import InstallPwaPrompt from "@/components/InstallPwaPrompt";
 import CategoryFilter from "@/components/CategoryFilter";
 import { DogReport, ProblemType, ReportStatus } from "@/lib/types";
-import { supabase, isSupabaseConfigured, DEMO_REPORTS } from "@/lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { calculateDistanceMeters, getDeviceGeolocation, getCachedCoordinates, watchLiveHardwareGPS } from "@/lib/geo";
 import { sendProximityAlert, getAlertRadiusKm } from "@/lib/notifications";
 
@@ -41,7 +41,7 @@ const MapView = dynamic(() => import("@/components/MapView"), {
 });
 
 export default function Home() {
-  const [reports, setReports] = useState<DogReport[]>(() => memoryReportsCache || DEMO_REPORTS);
+  const [reports, setReports] = useState<DogReport[]>(() => memoryReportsCache || []);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy?: number } | null>(() => getCachedCoordinates());
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<ProblemType | null>(null);
@@ -53,7 +53,7 @@ export default function Home() {
   const [page, setPage] = useState<number>(0);
   const [incomingAlert, setIncomingAlert] = useState<{ report: DogReport; distanceMeters: number | null } | null>(null);
 
-  // Fetch live reports from Supabase with pagination, local cache & demo resilience
+  // Fetch live reports from Supabase with pagination & in-memory caching
   const fetchReports = useCallback(async (isRefresh: boolean = false) => {
     const now = Date.now();
     if (!isRefresh && memoryReportsCache && now - memoryCacheTime < CACHE_TTL_MS) {
@@ -62,8 +62,6 @@ export default function Home() {
     }
 
     setIsLoading(true);
-    let loadedFromSupabase = false;
-
     try {
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase
@@ -72,37 +70,20 @@ export default function Home() {
           .order("created_at", { ascending: false })
           .range(0, PAGE_SIZE - 1);
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           const loaded = data as DogReport[];
           setReports(loaded);
           memoryReportsCache = loaded;
           memoryCacheTime = Date.now();
           setPage(0);
           setHasMore(loaded.length >= PAGE_SIZE);
-          loadedFromSupabase = true;
         }
       }
     } catch (e) {
       console.warn("Could not load from Supabase", e);
+    } finally {
+      setIsLoading(false);
     }
-
-    // Resilient fallback for hackathon presentation / offline demo
-    if (!loadedFromSupabase) {
-      try {
-        const localList: DogReport[] = JSON.parse(localStorage.getItem("pawalert_local_reports") || "[]");
-        const combined = [...localList, ...DEMO_REPORTS];
-        const unique = combined.filter((r, idx, arr) => arr.findIndex((x) => x.id === r.id) === idx);
-        setReports(unique);
-        memoryReportsCache = unique;
-        memoryCacheTime = Date.now();
-        setPage(0);
-        setHasMore(false);
-      } catch (e) {
-        setReports(DEMO_REPORTS);
-      }
-    }
-
-    setIsLoading(false);
   }, []);
 
   // Load more reports (infinite pagination)
@@ -281,11 +262,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-darkBg">
-      <Navbar
-        userLocation={userLocation}
-        onDetectLocation={() => detectLocation(true)}
-        isLocating={isLocating}
-      />
+      <Navbar />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
         {/* Proximity Distress Alert Notifications & Permission Prompt */}
@@ -357,11 +334,7 @@ export default function Home() {
             >
               <Compass className={`w-4 h-4 text-pawAmber ${isLocating ? "animate-spin" : ""}`} />
               <span>
-                {isLocating
-                  ? "Locating..."
-                  : userLocation
-                  ? `GPS Locked${userLocation.accuracy ? ` (±${Math.round(userLocation.accuracy)}m)` : ""}`
-                  : "Detect GPS"}
+                {userLocation ? "GPS Locked" : "Detect GPS"}
               </span>
             </button>
 
