@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { Crosshair, Loader2, Search, MapPin, CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { Crosshair, Loader2, MapPin, CheckCircle2, AlertTriangle, X } from "lucide-react";
 import { DogReport, PROBLEM_TYPE_LABELS, STATUS_LABELS } from "@/lib/types";
 import { escapeHtml } from "@/lib/security";
-import { getDeviceGeolocation, forwardGeocode, setManualVerifiedLocation } from "@/lib/geo";
+import { getDeviceGeolocation, setManualVerifiedLocation } from "@/lib/geo";
 
 interface MapViewProps {
   reports: DogReport[];
@@ -47,9 +47,7 @@ export default function MapView({
   const [mapType, setMapType] = useState<"satellite" | "street">(defaultMapType);
   const [isLocatingMap, setIsLocatingMap] = useState<boolean>(false);
 
-  // Search & Pinpoint state
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [isSearching, setIsSearching] = useState<boolean>(false);
+  // Pinpoint state
   const [isPinpointMode, setIsPinpointMode] = useState<boolean>(false);
   const isPinpointModeRef = useRef<boolean>(false);
   isPinpointModeRef.current = isPinpointMode;
@@ -383,7 +381,7 @@ export default function MapView({
             Accuracy: ±${accuracyMeters}m ${accuracyMeters > 500 ? "(Coarse Laptop/Wi-Fi)" : ""}
           </small>
           <div style="font-size: 11px; color: #555; margin-top: 6px; border-top: 1px solid #eee; pt-1;">
-            💡 <b>Tip:</b> Drag this blue pin or search above if you are on a laptop and Wi-Fi drifted.
+            💡 <b>Tip:</b> Drag this blue pin or tap Pinpoint to adjust your location.
           </div>
         </div>
       `);
@@ -445,71 +443,9 @@ export default function MapView({
     }
   };
 
-  // Search Area / Landmark handler (e.g. "Devdham, Umargam", "Vasai West")
-  const handleSearchLocation = async () => {
-    if (!searchQuery.trim() || !mapInstanceRef.current) return;
-    setIsSearching(true);
-    try {
-      const res = await forwardGeocode(searchQuery.trim());
-      if (res && res.lat !== 0 && res.lng !== 0) {
-        mapInstanceRef.current.flyTo([res.lat, res.lng], 17, { duration: 1.2 });
-        setManualVerifiedLocation(res.lat, res.lng);
-        hasInitiallyCenteredRef.current = true;
-
-        if (onLocationDetectedRef.current) {
-          onLocationDetectedRef.current(res.lat, res.lng, 5);
-        }
-        if (interactiveSelectRef.current && onSelectCoordinateRef.current) {
-          onSelectCoordinateRef.current(res.lat, res.lng);
-        }
-
-        setSuccessToast(`Found: ${searchQuery}! Location locked.`);
-        setTimeout(() => setSuccessToast(null), 3500);
-      } else {
-        setSuccessToast(`Could not find "${searchQuery}". Try adding city or state.`);
-        setTimeout(() => setSuccessToast(null), 3500);
-      }
-    } catch (e) {
-      console.warn("Search location error:", e);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
   return (
     <div className="w-full h-full relative rounded-2xl overflow-hidden border border-darkBorder bg-darkCard select-none">
       <div ref={mapContainerRef} className="w-full h-full min-h-[400px]" />
-
-      {/* Top Left: Quick Area / Landmark Search Bar */}
-      <div className="absolute top-3 left-12 z-[1000] flex items-center max-w-[210px] sm:max-w-xs w-full">
-        <div className="flex items-center bg-black/85 backdrop-blur-md border border-neutral-700/80 rounded-xl px-2.5 py-1.5 shadow-2xl w-full">
-          <Search className="w-3.5 h-3.5 text-pawAmber mr-1.5 shrink-0" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleSearchLocation();
-              }
-            }}
-            placeholder="Search city, area, street..."
-            className="bg-transparent text-xs text-white placeholder-neutral-400 focus:outline-none w-full"
-          />
-          {isSearching ? (
-            <Loader2 className="w-3.5 h-3.5 text-pawAmber animate-spin shrink-0" />
-          ) : searchQuery ? (
-            <button
-              type="button"
-              onClick={handleSearchLocation}
-              className="text-[10px] bg-pawAmber hover:bg-pawAmber-hover text-white font-bold px-1.5 py-0.5 rounded ml-1 shrink-0"
-            >
-              Go
-            </button>
-          ) : null}
-        </div>
-      </div>
 
       {/* Floating Controls: Layer Switcher, Pinpoint Me & Locate Me Button */}
       <div className="absolute top-3 right-3 z-[1000] flex items-center space-x-1.5">
@@ -649,31 +585,17 @@ export default function MapView({
           <p className="text-[11px] text-neutral-300 leading-relaxed">
             Laptops lack satellite GPS hardware; Chrome estimates location via Wi-Fi/ISP. On smartphones, PawAlert locks onto real GNSS satellites with <b>7–8m accuracy</b>.
           </p>
-          <div className="flex items-center gap-2 pt-0.5">
+          <div className="pt-0.5">
             <button
               type="button"
               onClick={() => {
                 setIsPinpointMode(true);
                 setShowCoarseWarning(false);
               }}
-              className="flex-1 py-1.5 px-2.5 rounded-xl bg-pawAmber hover:bg-pawAmber-hover text-white text-[11px] font-bold transition-all flex items-center justify-center space-x-1 shadow-md shadow-pawAmber/20"
+              className="w-full py-1.5 px-2.5 rounded-xl bg-pawAmber hover:bg-pawAmber-hover text-white text-[11px] font-bold transition-all flex items-center justify-center space-x-1 shadow-md shadow-pawAmber/20"
             >
               <MapPin className="w-3.5 h-3.5" />
               <span>Tap Map to Place Pin</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const searchEl = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
-                if (searchEl) {
-                  searchEl.focus();
-                  searchEl.select();
-                }
-              }}
-              className="py-1.5 px-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 text-[11px] font-semibold transition-all flex items-center space-x-1"
-            >
-              <Search className="w-3 h-3 text-pawAmber" />
-              <span>Search Area</span>
             </button>
           </div>
         </div>
