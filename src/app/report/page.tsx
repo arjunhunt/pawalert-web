@@ -287,11 +287,34 @@ export default function ReportPage() {
         }
       }
 
+      // Offline / Local storage fallback when Supabase is not linked or fails
+      const fallbackReport: DogReport = {
+        id: `local-report-${Date.now()}`,
+        reporter_id: getUserId(),
+        reporter_name: sanitizedReporterName || getUserName(),
+        problem_type: selectedCategory,
+        description: sanitizedDesc,
+        photo_url: photoUrl,
+        latitude: finalLat!,
+        longitude: finalLng!,
+        address: combinedAddress,
+        landmark: sanitizedLandmark,
+        status: "OPEN",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      try {
+        const existingLocal = JSON.parse(localStorage.getItem("pawalert_local_reports") || "[]");
+        localStorage.setItem("pawalert_local_reports", JSON.stringify([fallbackReport, ...existingLocal]));
+        addMyReportId(fallbackReport.id);
+      } catch (e) {}
+
       const curReports = parseInt(localStorage.getItem("pawalert_reports_made") || "0", 10);
       localStorage.setItem("pawalert_reports_made", (curReports + 1).toString());
 
-      // Fallback: Redirect to home on success
-      router.push("/");
+      // Redirect directly to the newly created alert
+      router.push(`/alert/${fallbackReport.id}`);
     } catch (e: any) {
       console.error("Submission failed", e);
       setErrorMessage(e.message || "Failed to submit report. Please try again.");

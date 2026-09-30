@@ -93,8 +93,8 @@ export function getAccurateGPSPosition(
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
       }
-      // ONLY cache if accuracy is true satellite precision (<= 25m)
-      if (result.lat !== 0 && result.lng !== 0 && result.accuracy <= 25) {
+      // ONLY cache if accuracy is high precision (<= 35m, compatible with indoor venues)
+      if (result.lat !== 0 && result.lng !== 0 && result.accuracy <= 35) {
         cacheCoordinates(result.lat, result.lng, result.accuracy);
       }
       resolve(result);
@@ -263,8 +263,8 @@ export function clearCachedCoordinates(): void {
  */
 export function cacheCoordinates(lat: number, lng: number, accuracy?: number): void {
   if (typeof window === "undefined") return;
-  // NEVER cache coarse cell-tower or Wi-Fi fixes (> 25m) as trusted location
-  if (accuracy && accuracy > 25) return;
+  // NEVER cache coarse cell-tower fixes (> 35m) as trusted location
+  if (accuracy && accuracy > 35) return;
   try {
     localStorage.setItem("pawalert_user_lat", lat.toString());
     localStorage.setItem("pawalert_user_lng", lng.toString());
